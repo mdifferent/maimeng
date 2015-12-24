@@ -7,7 +7,7 @@ var session = require('express-session');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var multer = require('multer');
-
+var config = require('./config.js');
 //Routers
 var routes = require('./routes');
 var users = require('./routes/users');
@@ -24,7 +24,7 @@ var app = express();
 //require('./routes/db').init();
 
 // view engine setup
-app.set('port', process.env.PORT || 3000);
+app.set('port', process.env.PORT || config.port);
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
 

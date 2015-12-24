@@ -1,21 +1,15 @@
 var logger = require('./logger').db;
 var async = require('async');
+var config = require('../config.json');
 
 //MongoDB configurations
-var mongoUrl = "mongodb://10.128.84.20:27017/test";
-var mongoConfig = {
-  db: {},
-  server: { poolSize: 5 },
-  replSet: {},
-  mongos: {}
-};
 var mongoCollections = ['users', 'items', 'comments'];
 var mongoClient = require('mongodb').MongoClient;
 var mongoInstance;
 
 // Use connect method to connect to the Server
 function initMongoDB(next) {
-  mongoClient.connect(mongoUrl, mongoConfig, function (err, db) {
+  mongoClient.connect(config.mongoUrl, config.mongoConfig, function (err, db) {
     logger.info('Init Mongo...');
     if (err)
       logger.fatal('MongoDB connection error : ' + err);
@@ -64,9 +58,7 @@ module.exports.init = initMongoDB;
 module.exports.finalize = finalizeMongoDB;
   
 //Redis configuration
-var redisServer = "10.128.84.31";
-var redisPort = '6379';
-var redisClient = require('redis').createClient(redisPort, redisServer);
+var redisClient = require('redis').createClient(config.redisPort, config.redisServer);
 
 redisClient.on("error", function (error) {
   logger.error(error);

@@ -1,0 +1,12 @@
+{
+    "port" : 3000,
+    "mongoUrl" : "mongodb://10.128.84.20:27017/test",
+    "mongoConfig" : {
+        "db": {},
+        "server": { "poolSize": 5 },
+        "replSet": {},
+        "mongos": {}
+    },
+    "redisServer" : "10.128.84.31",
+    "redisPort" : "6379"
+}
