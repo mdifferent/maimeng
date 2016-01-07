@@ -1,5 +1,6 @@
 var express = require('express');
 var router = express.Router();
+var logger = require('log4js').getLogger("admin");
 
 
 module.exports = router;

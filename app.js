@@ -1,13 +1,15 @@
 var express = require('express');
 var path = require('path');
 var favicon = require('serve-favicon');
-var logger = require('./routes/logger');
+//var logger = require('./routes/logger');
+var log4js = require('log4js');
 var methodOverride = require('method-override');
 var session = require('express-session');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var multer = require('multer');
-var config = require('./config.js');
+var config = require('./config/db.js');
+
 //Routers
 var routes = require('./routes');
 var users = require('./routes/users');
@@ -20,7 +22,7 @@ var image = require('./routes/image');
 var admin = require('./routes/admin');
 
 var app = express();
-
+var log = log4js.getLogger("app");
 //require('./routes/db').init();
 
 // view engine setup
@@ -30,7 +32,7 @@ app.set('view engine', 'jade');
 
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
-app.use(logger.express);
+app.use(log4js.connectLogger(log4js.getLogger("http"), { level: 'auto' }));
 app.use(methodOverride());
 app.use(session({ resave: true,
                   saveUninitialized: true,

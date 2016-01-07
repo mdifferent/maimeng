@@ -4,7 +4,7 @@ var async = require('async');
 var global = require('./global');
 var error = require('./error');
 var db = require('./db');
-var logger = require('./logger').access;
+var logger = require('log4js').getLogger("comment");
 var ObjectId = require('mongodb').ObjectId;
 
 /*根据对象的itemId属性添加相应的Item对象

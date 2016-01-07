@@ -1,5 +1,6 @@
 var express = require('express');
 var router = express.Router();
+var logger = require('log4js').getLogger("category");
 
 //一级分类下的物品列表
 router.get('/getItemListOfCategory', function(req, res) {

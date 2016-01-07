@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 
-var logger = require('./logger').access;
+var logger = require('log4js').getLogger("notification");
 var global =  require('./global');
 var error = require('./error');
 var db = require('./db');

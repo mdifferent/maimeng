@@ -1,4 +1,4 @@
-var logger = require('./logger').db;
+var logger = require('log4js').getLogger("db");
 var async = require('async');
 var config = require('../config.json');
 
@@ -14,8 +14,8 @@ function initMongoDB(next) {
     if (err)
       logger.fatal('MongoDB connection error : ' + err);
     else if (db) {
-      logger.info('MongoDB connect success : ' + mongoUrl);
-      logger.info('MongoDB check collections...' + mongoUrl);
+      logger.info('MongoDB connect success : ' + config.mongoUrl);
+      logger.info('MongoDB check collections...' + config.mongoUrl);
       module.exports.mongo = db;
       //logger.debug(module.exports.mongo);
       async.each(mongoCollections, function (collection, callback) {

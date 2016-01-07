@@ -2,7 +2,7 @@ var db = require('./db');
 var error = require('./error');
 var async = require('async');
 var assert = require('assert');
-var logger = require('./logger').access;
+var logger = require('log4js').getLogger("global");
 var ObjectId = require('mongodb').ObjectId;
 
 //客户端所需的User对象字段

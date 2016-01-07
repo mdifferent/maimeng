@@ -4,7 +4,7 @@ var express = require('express');
 
 var router = express.Router();
 var db = require('./db');
-var logger = require('./logger').access;
+var logger = require('log4js').getLogger("user");
 var error = require('./error');
 var global = require('./global');
 var ObjectId = require('mongodb').ObjectId;
