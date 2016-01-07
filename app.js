@@ -8,7 +8,7 @@ var session = require('express-session');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var multer = require('multer');
-var config = require('./config/db.js');
+var config = require('./config/db.json');
 
 //Routers
 var routes = require('./routes');
@@ -22,6 +22,7 @@ var image = require('./routes/image');
 var admin = require('./routes/admin');
 
 var app = express();
+log4js.configure("./config/log4js.json");
 var log = log4js.getLogger("app");
 //require('./routes/db').init();
 

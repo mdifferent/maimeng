@@ -1,6 +1,6 @@
 var logger = require('log4js').getLogger("db");
 var async = require('async');
-var config = require('../config.json');
+var config = require('../config/db.json');
 
 //MongoDB configurations
 var mongoCollections = ['users', 'items', 'comments'];

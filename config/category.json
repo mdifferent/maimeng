@@ -1,0 +1,157 @@
+{
+    "categoryList": [
+        {
+            "categoryId": 1,
+            "categoryName": "手办",
+            "subCategory": [
+                {
+                    "categoryId": 1,
+                    "categoryName": "萌系手办",
+                    "subCategory": [
+                        {
+                            "categoryId": 1,
+                            "categoryName": "PVC比例完成品"
+                        },
+                        {
+                            "categoryId": 2,
+                            "categoryName": "Figma"
+                        },
+                        {
+                            "categoryId": 3,
+                            "categoryName": "粘土"
+                        },
+                        {
+                            "categoryId": 4,
+                            "categoryName": "可动"
+                        },
+                        {
+                            "categoryId": 5,
+                            "categoryName": "GK"
+                        },
+                        {
+                            "categoryId": 6,
+                            "categoryName": "限定商品"
+                        },
+                        {
+                            "categoryId": 7,
+                            "categoryName": "其他"
+                        }
+                    ]
+                },
+                {
+                    "categoryId": 2,
+                    "categoryName": "一般向手办",
+                    "subCategory": [
+                        {
+                            "categoryId": 0,
+                            "categoryName": "其他"
+                        },
+                        {
+                            "categoryId": 1,
+                            "categoryName": "PVC比例完成品"
+                        },
+                        {
+                            "categoryId": 2,
+                            "categoryName": "Figma"
+                        },
+                        {
+                            "categoryId": 3,
+                            "categoryName": "粘土"
+                        },
+                        {
+                            "categoryId": 4,
+                            "categoryName": "可动"
+                        },
+                        {
+                            "categoryId": 5,
+                            "categoryName": "GK"
+                        },
+                        {
+                            "categoryId": 6,
+                            "categoryName": "限定商品"
+                        }
+                    ]
+                },
+                {
+                    "categoryId": 3,
+                    "categoryName": "其他手办",
+                    "subCategory": []
+                }
+            ]
+        },
+        {
+            "categoryId": 2,
+            "categoryName": "模型玩具",
+            "subCategory": [
+                {
+                    "categoryId": 0,
+                    "categoryName": "其他"
+                },
+                {
+                    "categoryId": 1,
+                    "categoryName": "比例模型",
+                    "subCategory": [
+                        {
+                            "categoryId": 1,
+                            "categoryName": "科幻类模型",
+                            "subCategory": [
+                                {
+                                    "categoryId": 0,
+                                    "categoryName": "其他"
+                                },
+                                {
+                                    "categoryId": 1,
+                                    "categoryName": "高达模型"
+                                },
+                                {
+                                    "categoryId": 2,
+                                    "categoryName": "装甲核心"
+                                },
+                                {
+                                    "categoryId": 3,
+                                    "categoryName": "Frame Arms"
+                                },
+                                {
+                                    "categoryId": 4,
+                                    "categoryName": "超级机器人大战"
+                                },
+                                {
+                                    "categoryId": 5,
+                                    "categoryName": "模型配件"
+                                },
+                                {
+                                    "categoryId": 6,
+                                    "categoryName": "限定商品"
+                                }
+                            ]
+                        },
+                        {
+                            "categoryId": 2,
+                            "categoryName": "真实比例模型",
+                            "subCategory": [
+                                {
+                                
+                                }
+                            ]
+                        },
+                        {
+                            "categoryId": 3,
+                            "categoryName": "无比例模型",
+                            "subCategory": []
+                        },
+                        {
+                            "categoryId": 4,
+                            "categoryName": "模型工具",
+                            "subCategory": []
+                        }
+                    ]
+                },
+                {
+                    "categoryId": 2,
+                    "categoryName": "玩具",
+                    "subCategory": []
+                }
+            ]
+        }
+    ]
+}
