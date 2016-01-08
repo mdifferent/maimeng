@@ -1,6 +1,7 @@
 var async = require('async');
 var crypto = require('crypto');
 var express = require('express');
+var jwt = require('jsonwebtoken');
 
 var router = express.Router();
 var db = require('./db');
@@ -30,15 +31,20 @@ router.post('/login', function (req, res) {
           }
       });
     };
-    //记录用户登录状态
-    var recordLoginStatus = function (user, next) {
+    //生成token
+    var generateToken = function (user, next) {
       var md5 = crypto.createHash('md5');
-      //Token生成格式：MD5(用户名+登录时间+IP)
+      //RandomKey生成格式：MD5(用户名+登录时间+IP)
       logger.debug(Date.now().toString());
       md5.update(user.userName + Date.now().toString() + req.ip);
-      var token = md5.digest('hex');
-      logger.debug(token);
-      db.redis.set(token, user._id, function (err, res) {
+      var randomKey = md5.digest('hex');
+      jwt.sign(user, randomKey, function(token) {
+          next(null, user, token, randomKey);
+      });
+    };
+    //记录登录状态
+    var recordLoginStatus = function(user, token, key, next) {
+      db.redis.hmset(token, 'key', key, 'user', user, function (err, res) {
         if (err)
           next(error.object.databaseError);
         else
@@ -52,7 +58,7 @@ router.post('/login', function (req, res) {
       else
         return res.status(201).jsonp({ data: result });
     };
-    async.waterfall([checkAccount, recordLoginStatus], callback);
+    async.waterfall([checkAccount, generateToken, recordLoginStatus], callback);
   } else {
     return res.status(400).jsonp({ errorMessage: error.message.client.fieldRequired });
   }
@@ -60,29 +66,18 @@ router.post('/login', function (req, res) {
 
 //用户登出
 router.post('/logout', function (req, res) {
-  var deleteSession = function (userId, next) {
-    db.redis.del(req.body.loginId, function (err, result) {
-      if (err) {
-        logger.error(error.message.server.redisWriteError + err);
-        next(error.object.databaseError, null);
-      } else if (result === 1) {
-        logger.debug(userId);
-        next(null, userId);
-      }
-    });
-  };
-  var callback = function (err, result) {
-    if (err)
-      return res.status(err.status).jsonp({ errorMessage: err.errorMessage });
-    else if (result) {
-      return res.status(201).jsonp({ data: result });
+    if (req.body.loginId && req.loginUser) {
+        db.redis.del(req.body.loginId, function (err, result) {
+            if (err) {
+                logger.error(error.message.server.redisWriteError + err);
+                return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
+            } else if (result === 1) {
+                return res.status(201).jsonp({ data: req.loginUser });
+            }
+        });
+    } else {
+        return res.status(400).jsonp({ errorMessage: error.message.client.fieldRequired });
     }
-  };
-  if (req.body.loginId) {
-    global.checkTokenWrapper(req, res, [deleteSession, global.getUserInfoById], callback);
-  } else {
-    return res.status(400).jsonp({ errorMessage: error.message.client.fieldRequired });
-  }
 });
 
 //用户注册
@@ -142,45 +137,44 @@ var updateCommonCallback = function (res) {
     }
   }
 }
+
 //用户更改密码
-router.post('/modifyPassword', function (req, res) {
+router.post('/modifyPassword', global.checkSession, function (req, res) {
   if (req.body.oldPassword && req.body.password) {
     //更新密码
-    var updateNewPassword = function (userId, next) {
+    var updateNewPassword = function (next) {
       var oldPasswordHash = req.body.oldPassword;
       var newPasswordHash = req.body.password;  //TODO : server side crypto
       db.mongo.collection('users').findOneAndUpdate(
-        { _id: ObjectId(userId), password:oldPasswordHash }, 
+        { _id: ObjectId(req.loginUser._id), password:oldPasswordHash }, 
         { $set: { password: newPasswordHash },
           $currentDate: { "updateTime": true }}, 
         { projection : global.userObjectFields, 
           returnOriginal:false },
         global.callbacks.mongoUpdate(next));
     };
-    global.checkTokenWrapper(req, res,updateNewPassword,
-      updateCommonCallback(res));
+    async.waterfall([updateNewPassword], updateCommonCallback(res));
   } else {
     return res.status(400).jsonp({ errorMessage: error.message.fieldRequired });
   }
-
 });
 
 //用户更改简介
-router.post('/modifyIntroduce', function (req, res) {
-  var operation = function (userId, next) {
+router.post('/modifyIntroduce', global.checkSession, function (req, res) {
+  var operation = function (next) {
     db.mongo.collection('users').findOneAndUpdate(
-      { _id: ObjectId(userId) }, 
+      { _id: ObjectId(req.loginUser._id) }, 
       { $set: { introduce: req.body.introduce },
         $currentDate: { "updateTime": true }},
       { projection : global.userObjectFields, 
         returnOriginal:false },
       global.callbacks.mongoUpdate(next));
   };
-  global.checkTokenWrapper(req, res, operation, updateCommonCallback(res));
+  async.waterfall([operation], updateCommonCallback(res));
 });
 
 //用户更改头像
-router.post('/modifyAvator', function (req, res) {
+router.post('/modifyAvator', global.checkSession, function (req, res) {
 
 });
 

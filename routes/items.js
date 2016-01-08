@@ -11,12 +11,12 @@ var ObjectId = require('mongodb').ObjectId;
 /************************************************
  * 发布物品
  ***********************************************/
-function addItemCommon(req, res, itemType) {
-	return function(userId, next) {
+function addItemCommon(req, itemType) {
+	return function(next) {
 		if (req.body.name && req.body.price) {
 			var data = req.body;
 			delete data.loginId;
-			data.userId = userId;
+			data.userId = req.loginUser._id;
 			data.type = itemType;
 			data.disable = false;
 			data.addTime = new Date().getTime();
@@ -39,18 +39,16 @@ function addItemCallbackCommon(res) {
 }
 
 //发布物品
-router.post('/addItem', function(req, res) {
-	global.checkTokenWrapper(req, res, 
-		[addItemCommon(req, res, global.itemType.forSell), 
-		 global.appendUserObject],
+router.post('/addItem', global.checkSession, global.decryptOnRequest, function(req, res) {
+	async.waterfall([addItemCommon(req, global.itemType.forSell), 
+		 global.appendUserObject(req.loginUser)],
 		addItemCallbackCommon(res));
 });
 
 //发布求物
 router.post('/addItemRequest', function(req, res) {
-	global.checkTokenWrapper(req, res, 
-		[addItemCommon(req, res, global.itemType.forBuy), 
-		 global.appendUserObject],
+	async.waterfall([addItemCommon(req, res, global.itemType.forBuy), 
+		 global.appendUserObject(req.loginUser)],
 		addItemCallbackCommon(res));
 });
 
@@ -59,8 +57,8 @@ router.post('/addItemRequest', function(req, res) {
  * 修改物品
  ***********************************************/
 //修改物品信息
-router.post('/modifyItem', function(req, res) {
-	var updateItemInfo = function(userId, next) {
+router.post('/modifyItem', global.checkSession, global.decryptOnRequest, function(req, res) {
+	var updateItemInfo = function(next) {
 		db.mongo.collection('items').findOneAndUpdate({ _id : ObjectId(req.body.itemId) }, 
 			{ $set: { name : req.body.name, 
 					categoryId : req.body.categoryId, 
@@ -84,12 +82,12 @@ router.post('/modifyItem', function(req, res) {
 			return res.status(201).jsonp({data:result[0]});
 		}
 	};
-	global.checkTokenWrapper(req, res, [updateItemInfo,global.appendUserObject], callback);
+	async.waterfall([updateItemInfo, global.appendUserObject(req.loginUser)], callback);
 });
 
 //使物品失效
-router.post('/disableItem', function(req, res) {
-	var operation = function(userId, next) {
+router.post('/disableItem', global.checkSession, global.decryptOnRequest, function(req, res) {
+	var operation = function(next) {
 		db.mongo.collection('items').findOneAndUpdate({ _id : ObjectId(req.body.itemId) }, 
 			{ $set : { disable : true },
 			  $currentDate: { "updateTime": true }},
@@ -103,7 +101,7 @@ router.post('/disableItem', function(req, res) {
 		else if (result)
 			return res.status(201).jsonp({data:result[0]});
 	};
-	global.checkTokenWrapper(req, res, [operation, global.appendUserObject], callback);
+	async.waterfall([operation, global.appendUserObject(req.loginUser)], callback);
 });
 
 /************************************************

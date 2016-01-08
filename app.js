@@ -1,14 +1,15 @@
 var express = require('express');
 var path = require('path');
 var favicon = require('serve-favicon');
-//var logger = require('./routes/logger');
 var log4js = require('log4js');
+var jwt = require('jsonwebtoken');
 var methodOverride = require('method-override');
 var session = require('express-session');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var multer = require('multer');
 var config = require('./config/db.json');
+var error = require('./error');
 
 //Routers
 var routes = require('./routes');
@@ -40,7 +41,6 @@ app.use(session({ resave: true,
                   secret: 'uwotm8' }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-//app.use(multer());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -61,6 +61,32 @@ app.use(function(req, res, next) {
   next(err);
 });
 
+// login check
+app.use(function(req, res, next) {
+   var token = req.body.loginId ? req.body.loginId : req.query.loginId;
+   if (token) {
+       require('./db').redis.hget(token, "key", function(err, result) {
+           if (err) {
+               res.status(400).jsonp({errorMessage:error.message.client.sessionTimeout});
+               log.error(error.message.server.redisReadError + err);
+           } else if (result) {
+               jwt.verify(token, result, function(err, decoded) {
+                   if (err) {
+                       log.error("Token verify error:" + err);
+                       res.status(400).jsonp({errorMessage:error.message.client.sessionTimeout});
+                   } else {
+                       req.loginUser = decoded;
+                       next();
+                   }
+               });
+           } else {
+               res.status(400).jsonp({errorMessage:error.message.client.tokenRequired});
+           }
+       });
+   } else {
+       next();
+   }
+});
 // error handlers
 
 // development error handler
