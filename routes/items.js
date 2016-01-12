@@ -1,4 +1,5 @@
 var async = require('async');
+var _ = require('lodash');
 var express = require('express');
 var router = express.Router();
 
@@ -160,8 +161,8 @@ function listCommonOperation(req, res, itemType) {
 	var callback = listCommonCallback(req, res);
 	if (req.query.userId) 
 		async.waterfall([global.getUserInfoById(req.query.userId), operation], callback);
-	else if (req.query.loginId)
-		global.checkTokenWrapper(req, res, [global.getUserInfoById(), operation], callback);
+	else if (req.query.loginId && req.loginUser)
+		async.waterfall([global.getUserInfoById(req.loginUser._id), operation], callback);
 	else
 		res.status(400).jsonp({errorMessage:error.object.fieldRequired});
 }
@@ -219,8 +220,8 @@ function toggleFavorite(toAdd) {
 	};
 };
 //获取Item对象
-function getItem(itemId) {
-	return function(userId, next) {
+function getItem(itemId, userId) {
+	return function(next) {
 		db.mongo.collection('items').find({_id:ObjectId(itemId)}, global.itemObjectFields)
 			.limit(1).toArray(function(err, doc) {
 			if (err) {
@@ -240,29 +241,31 @@ function getItem(itemId) {
 	}
 }
 //收藏物品
-router.post('/addItemToFavorite', function(req, res) {
+router.post('/addItemToFavorite', global.checkSession, global.decryptOnRequest, function(req, res) {
 	if (req.body.itemId)
-		global.checkTokenWrapper(req, res, 
-			[getItem(req.body.itemId), toggleFavorite(true), global.appendUserObject], 
+		async.waterfall([getItem(req.body.itemId, req.loginUser._id), 
+                        toggleFavorite(true), 
+                        global.appendUserObject()], 
 			favorateCommonCallback(res));
 	else
 		res.status(400).jsonp({errorMessage:error.message.client.fieldRequired});
 });
 
 //取消收藏
-router.post('/removeItemFromFavorite', function(req, res) {
+router.post('/removeItemFromFavorite', global.checkSession, global.decryptOnRequest, function(req, res) {
 	if (req.body.itemId)
-		global.checkTokenWrapper(req, res, 
-			[getItem(req.body.itemId), toggleFavorite(false), global.appendUserObject], 
+		async.waterfall([getItem(req.body.itemId, req.loginUser._id), 
+                        toggleFavorite(false), 
+                        global.appendUserObject()], 
 			favorateCommonCallback(res));
 	else
 		res.status(400).jsonp({errorMessage:error.message.client.fieldRequired});			
 });
 
 //获取我收藏的物品列表
-router.get('/getMyFavoriteItemList', function(req, res) {
-	var getItemIds = function(userId, next) {
-		db.mongo.collection('users').findOne({_id:ObjectId(userId)},{favorite:1},
+router.get('/getMyFavoriteItemList', global.checkSession, global.decryptOnRequest, function(req, res) {
+	var getItemIds = function(next) {
+		db.mongo.collection('users').findOne({_id:ObjectId(req.loginUser._id)},{favorite:1},
 			function(err, result) {
 				if (err) {
 					logger.error(error.message.server.mongoQueryError + err);
@@ -286,7 +289,9 @@ router.get('/getMyFavoriteItemList', function(req, res) {
 	var getItems = function(itemIds, next) {
 		if (itemIds) {
 			var itemIdObjects = [];
-			itemIds.forEach(function(id) {itemIdObjects.push(ObjectId(id));});
+            _.each(itemIds, function(itemId) {
+                itemIdObjects.push(ObjectId(itemId));
+            });
 			logger.debug(itemIdObjects);
 			db.mongo.collection('items').find({_id : {$in : itemIdObjects}}).toArray(
 				function(err, result) {
@@ -301,7 +306,7 @@ router.get('/getMyFavoriteItemList', function(req, res) {
 			next(null, null);
 		}
 	};
-	global.checkTokenWrapper(req, res, [getItemIds, getItems, global.appendUserObject], listCommonCallback(req, res));
+	async.waterfall([getItemIds, getItems, global.appendUserObject()], listCommonCallback(req, res));
 });
 
 module.exports = router;

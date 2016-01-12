@@ -1,82 +1,57 @@
 var express = require('express');
 var router = express.Router();
 var async = require('async');
+var _ = require('lodash');
 var global = require('./global');
 var error = require('./error');
 var db = require('./db');
 var logger = require('log4js').getLogger("comment");
 var ObjectId = require('mongodb').ObjectId;
 
-/*根据对象的itemId属性添加相应的Item对象
-  objsWithId : 具有itemId属性的对象或对象数组
-*/
-var appendItemObject = function (objsWithId, next) {
-	var uniqueItemMap = {};
-	//统一为Array进行操作
-	if (objsWithId && !(objsWithId instanceof Array)) {
-		objsWithId = [objsWithId];
-	}
-	//ItemId去重
-	for (var i = 0; i < objsWithId.length; ++i) {
-		uniqueItemMap[objsWithId[0].itemId] = 1;
-	}
-	//根据去重后的ItemId集合获取相应的Item对象
-	var getItems = function(next) {
-		async.each(Object.keys(uniqueItemMap), function(id, callback) {
-			db.mongo.collection('items').find({
-				_id: ObjectId(id)
-			}, global.itemObjectFields, function(err, result) {
-				if (err) {
-					logger.error(error.message.server.mongoQueryError + err);
-				} else if (result) {
-					uniqueItemMap[id] = result;
-				}
-				callback();
-			}).limit(1);
-		}, function(err, result) {
-			next(null, uniqueItemMap);
-		});
-	};
-	//给每一个传入的对象添加相应的item对象
-	var appendItem = function(map, next) {
-		async.each(objsWithId, function (obj, callback) {
-			obj.item = map[obj.itemId];
-			delete obj.itemId;
-			callback();
-		}, function (err) {
-			next(null, objsWithId);
-		});
-	}
-	async.waterfall([getItems, appendItem], function(err, result) {
-		next(null, result);
-	})
-};
-
 //为物品添加评论
-router.post('/addItemComment', function (req, res) {
-	var addComment = function (userId, next) {
+router.post('/addItemComment', global.checkSession, global.decryptOnRequest, function (req, res) {
+	//给商品添加评论
+    var addComment = function (next) {
 		var data = req.body;
 		delete data.loginId;
 		data.addTime = new Date().getTime();
-		data.userId = userId;
+		data.userId = req.loginUser._id;
 		//logger.debug(data);
 		db.mongo.collection('comments').insertOne(data, global.callbacks.mongoInsert(next));
 	};
+    //给该商品的发布者发送消息
 	var addNoti = function(commentObj, next) {
-		db.mongo.collection('users').findOneAndUpdate({_id:ObjectId()})
+        var data = {
+            userId : commentObj.item.userId,
+            itemCommentId : commentObj._id,
+            addTime : commentObj.addTime,
+            type : 1,       //TODO:消息类型
+            content : ''    //TODO:消息内容
+        };
+		db.mongo.collection('users').findOneAndUpdate({_id:ObjectId(commentObj.item.userId)}, 
+            {$addToSet:{notifications:data}},
+            function(err, result) {
+                if (err) {
+                    logger.error(error.message.server.mongoUpdateError + err);
+                    next(error.object.databaseError);
+                } else {
+                    next(null, commentObj);
+                }
+            });
 	};
 	var callback = function (err, result) {
 		if (err)
 			return res.status(err.status).json({ errorMessage: err.errorMessage });
-		else if (result)
-			return res.status(201).jsonp({ data: { itemComment: result[0] } });
+		else if (result) {
+            result[0].user = req.loginUser;
+            return res.status(201).jsonp({ data: { itemComment: result[0] } });
+        }	
 	}
-	global.checkTokenWrapper(req, res,
-		[addComment, global.appendUserObject, appendItemObject, addNoti], callback);
+	async.waterfall([addComment, global.appendItemObject, addNoti], callback);
 });
 
 //获取物品的评论/回复列表
-router.get('/getItemCommentList', function (req, res) {
+router.get('/getItemCommentList', global.checkSession, global.decryptOnRequest, function (req, res) {
 	var getCommentList = function(next) {
 		if (req.query.itemId) {
 			db.mongo.collection('comments').find({
@@ -106,7 +81,7 @@ router.get('/getItemCommentList', function (req, res) {
 				nextId: result.slice(-1)._id.toString()  
 			} });
 	};
-	async.waterfall([getCommentList, global.appendUserObject, appendItemObject], callback);
+	async.waterfall([getCommentList, global.appendUserObject, global.appendItemObject], callback);
 });
 
 

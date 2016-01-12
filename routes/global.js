@@ -42,28 +42,24 @@ module.exports = {
                 originalObj = [originalObj];
             if (originalObj) {
                 if (userObject) {
-                    _.each(originalObj, function (n) {
-                        originalObj.user = userObject;
+                    _.each(originalObj, function (obj) {
+                        obj.user = userObject;
                     });
                     next(null, originalObj);
                 } else {
-                    var uniqUserId = {};
-                    _.each(originalObj, function (obj) {
-                        uniqUserId[obj.userId] = ObjectId(obj.userId);
-                    });
+                    var uniqUserId = _.chain(originalObj)
+                        .map(originalObj, function (obj) {
+                            return ObjectId(obj.userId);
+                        }).uniq(true);
                     db.mongo.collection('users').find({
-                        _id : {$in : _.values(uniqUserId)}
+                        _id : {$in : uniqUserId}
                     }, userObjectFields).toArray(function(err, results) {
                         if (err) {
                             logger.error(error.message.server.mongoQueryError);
                             next(error.object.databaseError);
                         } else if (results) {
-                            var uniqUserIdObjects = {};
-                            _.each(results, function(result) {
-                                uniqUserIdObjects[result._id.toString()] = result;
-                            });
                             _.each(originalObj, function (obj) {
-                                obj.user = uniqUserIdObjects[obj.userId];
+                                obj.user = _.find(results, {_id : obj.userId});
                                 delete obj.userId;
                             });
                             next(null, originalObj);
@@ -76,9 +72,37 @@ module.exports = {
         };
     },
     
+    //根据itemId字段添加给客户端的Item对象
+    appendItemObject : function (objsWithId, next) {
+        //统一为Array进行操作
+        if (objsWithId && !(objsWithId instanceof Array)) {
+            objsWithId = [objsWithId];
+        }
+        //获取去重后的itemId
+        var uniqItemIds = _.chain(objsWithId)
+            .map(function (obj) {
+                return ObjectId(obj.itemId);
+            }).uniq(true);
+
+        db.mongo.collection('items').find({
+            _id: { $in: uniqItemIds }
+        }, itemObjectFields, function (err, result) {
+            if (err) {
+                logger.error(error.message.server.mongoQueryError + err);
+                next(error.object.databaseError);
+            } else if (result) {
+                _.each(objsWithId, function (obj) {
+                    obj.item = _.find(result, { _id: obj.itemId });
+                    delete obj.itemId;
+                });
+                next(null, result);
+            }
+        });
+    },
+    
     //获取用于返回给客户端的User对象
-    getUserInfoById : function(userId) {
-        var callback = function(next) {
+    getUserInfoById: function (userId) {
+        var callback = function (next) {
             return function (err, docs) {
                 if (err) {
                     logger.error(error.message.server.mongoQueryError + err);
@@ -89,16 +113,9 @@ module.exports = {
                 }
             };
         };
-        if (userId) {
-            return function(next) {
-                db.mongo.collection('users').find({ _id: ObjectId(userId) }, userObjectFields)
+        return function (next) {
+            db.mongo.collection('users').find({ _id: ObjectId(userId) }, userObjectFields)
                 .limit(1).toArray(callback(next));
-            }
-        } else {
-            return function (userId, next) {
-                db.mongo.collection('users').find({ _id: ObjectId(userId) }, userObjectFields)
-                .limit(1).toArray(callback(next));
-            };
         }
     },
     
