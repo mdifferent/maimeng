@@ -8,7 +8,7 @@ var ImageSchema = new Schema({
 var NotificationSchema = new Schema({
     type:                   Number,
     content:                String,
-    addTime:                Number,
+    addTime:                { type: Date, default: Date.now },
     userId:                 { type: Schema.Types.ObjectId, ref: 'users' },
     commentId:              { type: Schema.Types.ObjectId, ref: 'comments' },
 });
@@ -42,7 +42,7 @@ var ItemSchema = new Schema({
 
 var CommentSchema = new Schema({
     content:                String,
-    addTime:                Number,
+    addTime:                { type:Date, default: Date.now },
     itemId:                 { type: Schema.Types.ObjectId, ref: 'items' },
     userId:                 { type: Schema.Types.ObjectId, ref: 'users' }
 });

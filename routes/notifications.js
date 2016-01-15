@@ -7,40 +7,41 @@ var global = require('./global');
 var error = require('./error');
 var db = require('./db');
 
+var Model = require('../models/mongoModels');
+var User = require('../models/mongoModels').User;
+
+
 //获取我的消息列表
 router.get('/getMyNotificationList', function (req, res) {
-    var getMyNotifications = function (next) {
-        db.mongo.collection('users').find({ _id: req.loginUser._id },
-            { notifications: 1 }).limit(1).next(function (err, doc) {
+    User.findById(req.loginUser._id).select('notifications').exec(function(err, user) {
+        if (err) {
+            logger.error(error.message.server.mongoQueryError + err);
+            return res.status(500).json(error.message.client.databaseError);
+        } else if (user) {
+            var startIdx = _.findIndex(user.notifications, function(notification) {
+                return notification._id.toString() === req.query.nextId;
+            }) + 1;
+            var notis = _.slice(user.notifications, startIdx, startIdx + parseInt(req.query.numPerPage));
+            User.populate(notis, {path:'userId'}, function(err, notis) {
                 if (err) {
                     logger.error(error.message.server.mongoQueryError + err);
-                    return res.status(500).json(error.message.client.databaseError);
-                } else if (doc) {
-                    var beginIndex = 0;
-                    for (var i = 0; i < doc.notifications.length; ++i) {
-                        if (doc.notifications[i]._id === req.query.nextId) {
-                            beginIndex = i + 1;
-                            break;
+                } 
+                if (notis) {                    
+                    Comment.populate(notis, {path:'commentId'}, function(err, notis) {
+                        if (err) {
+                            logger.error(error.message.server.mongoQueryError + err);
+                        } 
+                        if (notis) {                           
+                            return res.status(200).jsonp({data:{
+                                nextId:notis.slice(-1)[0]._id, 
+                                pageCount:req.query.pageCount, 
+                                notificationList:notis}});
                         }
-                    }
-                    next(null, doc.notifications.slice(beginIndex, beginIndex + req.query.numPerPage));
+                    });
                 }
             });
-    };
-    var callback = function (err, result) {
-        if (err)
-            return res.status(err.status).json({
-                errorMessage: err.errorMessage
-            });
-        else if (result) {
-            return res.status(200).json({
-                nextId: result.slice(-1).id,
-                pageCount: req.query.pageCount,
-                notificationList: result
-            });
         }
-    };
-    async.waterfall([getMyNotifications, global.appendUserObject], callback);
+    });
 });
 
 router.post('/sendNotification', function (req, res) {

@@ -6,6 +6,9 @@ var _ = require('lodash');
 var logger = require('log4js').getLogger("global");
 var ObjectId = require('mongodb').ObjectId;
 
+var Model = require('../models/mongoModels');
+var Item = require('../models/mongoModels').Item;
+
 //客户端所需的User对象字段
 var userObjectFields = { _id: 1, userName: 1, email: 1, avator: 1, regionCode: 1, introduce: 1 };
 module.exports.userObjectFields = userObjectFields;
@@ -83,21 +86,20 @@ module.exports = {
             .map(function (obj) {
                 return ObjectId(obj.itemId);
             }).uniq(true);
-
-        db.mongo.collection('items').find({
-            _id: { $in: uniqItemIds }
-        }, itemObjectFields, function (err, result) {
-            if (err) {
-                logger.error(error.message.server.mongoQueryError + err);
-                next(error.object.databaseError);
-            } else if (result) {
-                _.each(objsWithId, function (obj) {
-                    obj.item = _.find(result, { _id: obj.itemId });
-                    delete obj.itemId;
-                });
-                next(null, result);
-            }
-        });
+        Item.find().where('_id').in(uniqItemIds)
+            .select(Model.ItemFieldsForCli)
+            .populate('userId', Model.UserFieldsForCli)
+            .exec(function(err, items) {
+                if (err) {
+                    
+                } else if (items) {
+                     _.each(objsWithId, function (obj) {
+                        obj.item = _.find(items, { _id: obj.itemId });
+                        delete obj.itemId;
+                    });
+                    next(null, objsWithId);
+                }
+            });
     },
     
     //获取用于返回给客户端的User对象
