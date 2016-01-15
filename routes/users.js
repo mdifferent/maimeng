@@ -9,6 +9,7 @@ var logger = require('log4js').getLogger("user");
 var error = require('./error');
 var global = require('./global');
 var ObjectId = require('mongodb').ObjectId;
+var User = require('../models/mongoModels').User;
 
 //用户登录
 router.post('/login', function (req, res) {
@@ -18,16 +19,14 @@ router.post('/login', function (req, res) {
                         password: req.body.password };                  
     //读取用户数据
     var checkAccount = function (next) {
-      db.mongo.collection('users').find(queryFilter, global.userObjectFields).limit(1)
-        .toArray(function (err, docs) {
-          logger.debug(docs);
+      User.findOne(queryFilter).select(global.userObjectFields).exec(function(err, user) {
           if (err) {
             logger.error(exports.message.server.mongoQueryError + err);
             next(error.object.databaseError);
-          } else if (docs.length === 1) {
-            next(null, docs[0]);
+          } else if (user) {
+            next(null, user);
           } else {
-            next({ status: 404, errorMessage: error.message.userNotFound });
+            next(error.object.userNotFound);
           }
       });
     };
@@ -83,35 +82,33 @@ router.post('/logout', function (req, res) {
 //用户注册
 router.post('/register', function (req, res) {
   if (req.body.userName && req.body.password && req.body.email) {
-    var data = req.body;
-    data.createdAt = new Date().getTime();
     //检测用户名是否已存在
-    var checkUserExist = function (callback) {
-      db.mongo.collection('users').find({ $or: [{ uesrName: req.body.userName }, { email: req.body.email }] })
-        .limit(1).toArray(function (err, docs) {
-          if (err) {
-            logger.error(exports.message.server.mongoQueryError + err);
-            callback(error.object.databaseError, null);
-          } else if (docs.length > 0) {
-            callback({ status: 400, msg: error.message.client.usernameExist }, null);
-          } else {
-            callback(null);
-          }          
+    var checkUserExist = function (next) {
+        var checkField = { $or: [{ uesrName: req.body.userName }, { email: req.body.email }] };
+        User.findOne(checkField, function(err, user) {
+            if (err) {
+                logger.error(exports.message.server.mongoQueryError + err);
+                next(error.object.databaseError);
+            } else if (user) {
+                next(error.object.userNameDuplicate);
+            } else {
+                next();
+            }
         });
     };
     //创建新用户
-    var createAccount = function (callback) {
-      db.mongo.collection('users').insertOne(data, function (err, result) {
-        if (err) {
-          logger.error(exports.message.server.mongoInsertError + err);
-          callback(error.object.databaseError, null);
-        } else if (result.insertedCount === 1) {
-          logger.debug(result);
-          callback(null, result.ops[0]);
-        } else {
-          callback(error.object.databaseError, null);
-        }
-      });
+    var createAccount = function (next) {
+        User.create(req.body, function (err, user) {
+            if (err) {
+                logger.error(exports.message.server.mongoInsertError + err);
+                next(error.object.databaseError, null);
+            } else if (user) {
+                //logger.debug(result);
+                next(null, user);
+            } else {
+                next(error.object.databaseError, null);
+            }
+        });
     };
     var callback = function (err, result) {
       if (err) {
@@ -140,37 +137,44 @@ var updateCommonCallback = function (res) {
 
 //用户更改密码
 router.post('/modifyPassword', global.checkSession, function (req, res) {
-  if (req.body.oldPassword && req.body.password) {
-    //更新密码
-    var updateNewPassword = function (next) {
-      var oldPasswordHash = req.body.oldPassword;
-      var newPasswordHash = req.body.password;  //TODO : server side crypto
-      db.mongo.collection('users').findOneAndUpdate(
-        { _id: ObjectId(req.loginUser._id), password:oldPasswordHash }, 
-        { $set: { password: newPasswordHash },
-          $currentDate: { "updateTime": true }}, 
-        { projection : global.userObjectFields, 
-          returnOriginal:false },
-        global.callbacks.mongoUpdate(next));
-    };
-    async.waterfall([updateNewPassword], updateCommonCallback(res));
-  } else {
-    return res.status(400).jsonp({ errorMessage: error.message.fieldRequired });
-  }
+    if (req.body.oldPassword && req.body.password) {
+        var oldPasswordHash = req.body.oldPassword;
+        var newPasswordHash = req.body.password;  //TODO : server side crypto
+        User.findOneAndUpdate(
+            { _id: ObjectId(req.loginUser._id), password: oldPasswordHash },
+            { password: newPasswordHash,  },
+            { new: true, select: 'userName email phone regionCode introduce avator createdAt' },
+            function (err, user) {
+                if (err) {
+                    logger.error(error.message.internal.mongoUpdateError + err);
+                    return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
+                } else if (user) {
+                    return res.status(201).jsonp({ data: { user: user } });
+                }
+            });
+    } else {
+        return res.status(400).jsonp({ errorMessage: error.message.fieldRequired });
+    }
 });
 
 //用户更改简介
 router.post('/modifyIntroduce', global.checkSession, function (req, res) {
-  var operation = function (next) {
-    db.mongo.collection('users').findOneAndUpdate(
-      { _id: ObjectId(req.loginUser._id) }, 
-      { $set: { introduce: req.body.introduce },
-        $currentDate: { "updateTime": true }},
-      { projection : global.userObjectFields, 
-        returnOriginal:false },
-      global.callbacks.mongoUpdate(next));
-  };
-  async.waterfall([operation], updateCommonCallback(res));
+    if (req.body.introduce) {
+        User.findOneAndUpdate(
+            { _id: ObjectId(req.loginUser._id) },
+            { introduce : req.body.introduce, lastModified: Date.now },
+            { new: true, select: 'userName email phone regionCode introduce avator createdAt' },
+            function (err, user) {
+                if (err) {
+                    logger.error(error.message.internal.mongoUpdateError + err);
+                    return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
+                } else if (user) {
+                    return res.status(201).jsonp({ data: { user : user } });
+                }
+            });
+    } else {
+        return res.status(400).jsonp({ errorMessage: error.message.fieldRequired });
+    }
 });
 
 //用户更改头像
@@ -180,18 +184,18 @@ router.post('/modifyAvator', global.checkSession, function (req, res) {
 
 //用户详细信息
 router.get('/getUserDetail', function (req, res) {
-  db.mongo.collection('users').find({ _id: ObjectId(req.query.userId) }, global.userObjectFields)
-    .limit(1).toArray(function (err, docs) {
-      logger.debug(docs);
-      if (err) {
-        logger.error(exports.message.server.mongoQueryError + err);
-        return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
-      } else if (docs.length > 0) {
-        return res.status(200).jsonp({ data: { user: docs[0] } });
-      } else {
-        return res.status(404).jsonp({ errorMessage: error.message.client.userNotFound });
-      }
-    });
+    User.findById(req.query.userId, 
+        'userName email phone regionCode introduce avator createdAt', 
+        function(err, user) {
+            if (err) {
+                logger.error(exports.message.server.mongoQueryError + err);
+                return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
+            } else if (user) {
+                return res.status(200).jsonp({ data: { user: user} });
+            } else {
+                return res.status(404).jsonp({ errorMessage: error.message.client.userNotFound });
+            }
+        });
 });
 
 module.exports = router;

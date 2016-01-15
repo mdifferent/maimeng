@@ -25,6 +25,9 @@ module.exports.message = {
 module.exports.object = {
 	databaseError : {status:500, errorMessage: '数据库错误'},
 	fieldRequired : {status:400, errorMessage: '缺少必要的字段'},
-	favorateSelf : {status:400, errorMessage: '无法收藏自己发布的物品'}
+	favorateSelf : {status:400, errorMessage: '无法收藏自己发布的物品'},
+    userNotFound : {status:404, errorMessage: '未找到该用户'},
+    userNameDuplicate : {status:400, errorMessage: '用户名或email已被使用'},
+    itemNotFound : {status:404, errorMessage: '未找到该商品'}
 };
 
