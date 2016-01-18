@@ -1,4 +1,15 @@
 var mongoose = require('mongoose');
+var logger = require('log4js').getLogger("db");
+var _ = require('lodash');
+var config = require('../config/db.json');
+var db = mongoose.connection;
+mongoose.connect(config.mongoUrl, config.mongoConfig);
+db.on('error', console.error.bind(console, 'connection error:'));
+db.once('open', function() {
+    logger.info('MongoDB connect success : ' + config.mongoUrl);
+    logger.info('MongoDB check collections...' + config.mongoUrl);
+    checkCollections();
+});
 var Schema = mongoose.Schema;
 
 var ImageSchema = new Schema({
@@ -9,8 +20,8 @@ var NotificationSchema = new Schema({
     type:                   Number,
     content:                String,
     addTime:                { type: Date, default: Date.now },
-    userId:                 { type: Schema.Types.ObjectId, ref: 'users' },
-    commentId:              { type: Schema.Types.ObjectId, ref: 'comments' },
+    user:                   { type: Schema.Types.ObjectId, ref: 'users' },
+    comment:                { type: Schema.Types.ObjectId, ref: 'comments' },
 });
 
 var UserSchema = new Schema({
@@ -36,15 +47,15 @@ var ItemSchema = new Schema({
     price:                  Number,
     addTime:                { type: Date, default: Date.now },
     updateTime:             { type: Date, default: Date.now },
-    userId:                 { type: Schema.Types.ObjectId, ref: 'users' },
+    user:                   { type: Schema.Types.ObjectId, ref: 'users' },
     images:                 [ImageSchema]
 });
 
 var CommentSchema = new Schema({
     content:                String,
     addTime:                { type:Date, default: Date.now },
-    itemId:                 { type: Schema.Types.ObjectId, ref: 'items' },
-    userId:                 { type: Schema.Types.ObjectId, ref: 'users' }
+    item:                   { type: Schema.Types.ObjectId, ref: 'items' },
+    user:                   { type: Schema.Types.ObjectId, ref: 'users' }
 });
 
 module.exports = {
@@ -55,3 +66,17 @@ module.exports = {
     ItemFieldsForCli : '_id name type disable categoryId secondCategoryId conditionId' 
         + ' regionCode descriptionContent price addTime updateTime images',
 };
+
+var mongoCollections = ['users','items','comments'];
+function checkCollections(next) {
+    db.db.listCollections().toArray(function(err, cols) {
+        _.each(mongoCollections, function(colName) {
+            if (_.find(cols, {'name': colName})) {
+                logger.info(colName + ' found');
+            } else {
+                db.db.collection(colName);
+                logger.info(colName + ' created');
+            }
+        })
+    });
+}

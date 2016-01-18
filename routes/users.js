@@ -9,6 +9,7 @@ var logger = require('log4js').getLogger("user");
 var error = require('./error');
 var global = require('./global');
 var ObjectId = require('mongodb').ObjectId;
+var Model = require('../models/mongoModels');
 var User = require('../models/mongoModels').User;
 
 //用户登录
@@ -19,7 +20,7 @@ router.post('/login', function (req, res) {
                         password: req.body.password };                  
     //读取用户数据
     var checkAccount = function (next) {
-      User.findOne(queryFilter).select(global.userObjectFields).exec(function(err, user) {
+      User.findOne(queryFilter).select(Model.UserFieldsForCli).exec(function(err, user) {
           if (err) {
             logger.error(exports.message.server.mongoQueryError + err);
             next(error.object.databaseError);

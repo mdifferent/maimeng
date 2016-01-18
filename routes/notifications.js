@@ -13,33 +13,44 @@ var User = require('../models/mongoModels').User;
 
 //获取我的消息列表
 router.get('/getMyNotificationList', function (req, res) {
-    User.findById(req.loginUser._id).select('notifications').exec(function(err, user) {
+    var findUser = function (next) {
+        User.findById(req.loginUser._id).select('notifications').exec(function (err, user) {
+            if (err) {
+                logger.error(error.message.server.mongoQueryError + err);
+                return res.status(500).json(error.message.client.databaseError);
+            } else if (user) {
+                var startIdx = _.findIndex(user.notifications, function (notification) {
+                    return notification._id.toString() === req.query.nextId;
+                }) + 1;
+                var notis = _.slice(user.notifications, startIdx, startIdx + parseInt(req.query.numPerPage));
+                next(null, notis);
+            }
+        });
+    };
+    var appendUser = function(notis, next) {
+        User.populate(notis, { path: 'user' }, function (err, notis) {
+            if (err)
+                logger.error(error.message.server.mongoQueryError + err);
+            if (notis)
+                next(null, notis);
+        });
+    };
+    var appendComment = function(notis, next) {
+        Comment.populate(notis, {path:'comment'}, function(err, notis) {
+            if (err)
+                logger.error(error.message.server.mongoQueryError + err);
+            if (notis)   
+                next(null, notis);
+        });
+    };
+    async.waterfall([findUser, appendUser, appendComment], function(err, result) {
         if (err) {
-            logger.error(error.message.server.mongoQueryError + err);
-            return res.status(500).json(error.message.client.databaseError);
-        } else if (user) {
-            var startIdx = _.findIndex(user.notifications, function(notification) {
-                return notification._id.toString() === req.query.nextId;
-            }) + 1;
-            var notis = _.slice(user.notifications, startIdx, startIdx + parseInt(req.query.numPerPage));
-            User.populate(notis, {path:'userId'}, function(err, notis) {
-                if (err) {
-                    logger.error(error.message.server.mongoQueryError + err);
-                } 
-                if (notis) {                    
-                    Comment.populate(notis, {path:'commentId'}, function(err, notis) {
-                        if (err) {
-                            logger.error(error.message.server.mongoQueryError + err);
-                        } 
-                        if (notis) {                           
-                            return res.status(200).jsonp({data:{
-                                nextId:notis.slice(-1)[0]._id, 
-                                pageCount:req.query.pageCount, 
-                                notificationList:notis}});
-                        }
-                    });
-                }
-            });
+            
+        } else {
+            return res.status(200).jsonp({data:{
+                nextId:result.slice(-1)[0]._id, 
+                pageCount:req.query.pageCount, 
+                notificationList:result}});
         }
     });
 });

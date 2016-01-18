@@ -9,7 +9,7 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var multer = require('multer');
 var config = require('./config/db.json');
-var error = require('./error');
+var error = require('./routes/error');
 
 //Routers
 var routes = require('./routes');
@@ -65,7 +65,7 @@ app.use(function(req, res, next) {
 app.use(function(req, res, next) {
    var token = req.body.loginId ? req.body.loginId : req.query.loginId;
    if (token) {
-       require('./db').redis.hget(token, "key", function(err, result) {
+       require('./routes/db').redis.hget(token, "key", function(err, result) {
            if (err) {
                res.status(400).jsonp({errorMessage:error.message.client.sessionTimeout});
                log.error(error.message.server.redisReadError + err);

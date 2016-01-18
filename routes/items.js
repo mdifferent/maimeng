@@ -19,7 +19,7 @@ function addItemCommon(req, res, itemType) {
     if (req.body.name && req.body.price) {
         var data = req.body;
         delete data.loginId;
-        data.userId = req.loginUser._id;
+        data.user = req.loginUser._id;
         data.type = itemType;
         data.disable = false;
         Item.create(data, function (err, item) {
@@ -28,7 +28,6 @@ function addItemCommon(req, res, itemType) {
                 return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
             } else if (item) {
                 item.user = req.loginUser;
-                delete item.userID;
                 return res.status(201).jsonp({ data: { item: item } });
             }
         });
@@ -58,7 +57,6 @@ router.post('/addItemRequest', function(req, res) {
             return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
         } else if (item) {
             item.user = req.loginUser;
-            delete item.userID;
             return res.status(201).jsonp({ data: { item: item } });
         }
     }
@@ -86,7 +84,7 @@ router.get('/getItemDetail', function(req, res) {
 	if (req.query.itemId) {
 		Item.findById(req.query.itemId)
             .select(Model.ItemFieldsForClie)
-            .populate('userId', Model.UserFieldsForCli)
+            .populate('user', Model.UserFieldsForCli)
             .exec(function(err, item) {
                 if (err) {
                     logger.error(error.message.server.mongoQueryError + err);
@@ -106,16 +104,16 @@ router.get('/getItemDetail', function(req, res) {
 function listCommonOperation(req, res, itemType) {
     var query = Item.find({ type: parseInt(itemType) });
     if (req.query.userId)
-        query.where('userId').eq(req.query.userId);
+        query.where('user').eq(req.query.userId);
     else if (req.loginUser)
-        query.where('userId').eq(req.loginUser._id);
+        query.where('user').eq(req.loginUser._id);
     else
         return res.status(400).jsonp({ errorMessage: error.object.fieldRequired });
     if (req.query.nextId)
         query.where('_id').gt(req.query.nextId);
     query.select(Model.ItemFieldsForCli);
     query.sort('_id', 1).limit(parseInt(req.query.numPerPage));
-    query.populate('userId', Model.UserFieldsForCli);
+    query.populate('user', Model.UserFieldsForCli);
     query.exec(function (err, items) {
         if (err) {
             logger.error(error.message.server.mongoQueryError + err);
@@ -162,7 +160,9 @@ function favorateCommonCallback(res) {
 function toggleFavorite(toAdd) {
     return function (item, userId, next) {
         var itemId = item._id;
-        var operation = toAdd ? { $addToSet: { favorites: itemId } } : { $pull: { favorites: itemId } };
+        var operation = toAdd 
+            ? { $addToSet: { favorites: itemId } } 
+            : { $pull: { favorites: itemId } };
         User.findByIdAndUpdate(userId, operation, function (err, user) {
             if (err) {
                 logger.error(error.message.server.mongoUpdateError + err);
@@ -177,14 +177,14 @@ function toggleFavorite(toAdd) {
 function getItem(itemId, userId) {
     return function (next) {
         Item.findById(itemId, Model.ItemFieldsForCli)
-            .populate('userId', Model.UserFieldsForCli)
+            .populate('user', Model.UserFieldsForCli)
             .exec(function (err, item) {
                 if (err) {
                     logger.error(error.message.internal.mongoQueryError + err);
                     next(error.object.databaseError);
                 } else if (item) {
                     //验证是否收藏自己发布的物品
-                    if (item.userId === userId)
+                    if (item.user._id === userId)
                         next(error.object.favorateSelf);
                     else
                         next(null, item, userId);
