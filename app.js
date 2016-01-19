@@ -3,6 +3,7 @@ var path = require('path');
 var favicon = require('serve-favicon');
 var log4js = require('log4js');
 var jwt = require('jsonwebtoken');
+var crypto = require('crypto');
 var methodOverride = require('method-override');
 var session = require('express-session');
 var cookieParser = require('cookie-parser');
@@ -10,6 +11,7 @@ var bodyParser = require('body-parser');
 var multer = require('multer');
 var config = require('./config/db.json');
 var error = require('./routes/error');
+var logger = require('log4js').getLogger("app");
 
 //Routers
 var routes = require('./routes');
@@ -44,33 +46,21 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/', routes);
-app.use('/User', users);
-app.use('/Item',items);
-app.use('/Comment',comments);
-app.use('/Notification',notifications);
-app.use('/Category',category);
-app.use('/Search',search);
-app.use('/Image',image);
-app.use('/Admin',admin);
-
-// catch 404 and forward to error handler
-app.use(function(req, res, next) {
-  var err = new Error('Not Found');
-  err.status = 404;
-  next(err);
-});
-
 // login check
 app.use(function(req, res, next) {
+   //logger.debug(req); 
    var token = req.body.loginId ? req.body.loginId : req.query.loginId;
+   logger.debug(token);
    if (token) {
-       require('./routes/db').redis.hget(token, "key", function(err, result) {
+       var md5 = crypto.createHash('md5');
+       md5.update(token);
+       require('./routes/db').redis.hget(md5.digest('hex'), "key", function(err, key) {
            if (err) {
                res.status(400).jsonp({errorMessage:error.message.client.sessionTimeout});
                log.error(error.message.server.redisReadError + err);
-           } else if (result) {
-               jwt.verify(token, result, function(err, decoded) {
+           } else if (key) {
+               jwt.verify(token, key, function(err, decoded) {
+                   logger.debug('User:' + decoded);
                    if (err) {
                        log.error("Token verify error:" + err);
                        res.status(400).jsonp({errorMessage:error.message.client.sessionTimeout});
@@ -87,7 +77,16 @@ app.use(function(req, res, next) {
        next();
    }
 });
+
+
 // error handlers
+/*
+// catch 404 and forward to error handler
+app.use(function(req, res, next) {
+  var err = new Error('Not Found');
+  err.status = 404;
+  next(err);
+});*/
 
 // development error handler
 // will print stacktrace
@@ -110,6 +109,17 @@ app.use(function(err, req, res, next) {
     error: {}
   });
 });
+
+
+app.use('/', routes);
+app.use('/User', users);
+app.use('/Item',items);
+app.use('/Comment',comments);
+app.use('/Notification',notifications);
+app.use('/Category',category);
+app.use('/Search',search);
+app.use('/Image',image);
+app.use('/Admin',admin);
 
 app.listen(app.get('port'), function() {
   console.log('Express server listening on port ' + app.get('port'));

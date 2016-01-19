@@ -6,8 +6,6 @@ var router = express.Router();
 var logger = require('log4js').getLogger("item");
 var global =  require('./global');
 var error = require('./error');
-var db = require('./db');
-var ObjectId = require('mongodb').ObjectId;
 var Model = require('../models/mongoModels');
 var Item = require('../models/mongoModels').Item;
 var User = require('../models/mongoModels').User;
@@ -27,8 +25,14 @@ function addItemCommon(req, res, itemType) {
                 logger.error(error.message.server.mongoInsertError + err);
                 return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
             } else if (item) {
-                item.user = req.loginUser;
-                return res.status(201).jsonp({ data: { item: item } });
+                User.populate(item, { path: 'user', select : Model.UserFieldsForCli }, 
+                    function (err, item) {
+                        if (err) 
+                            logger.error(error.message.server.mongoQueryError + err);
+                        return res.status(201).jsonp({
+                            data: { item: item.toJSON({ versionKey: false }) }
+                        });
+                });
             }
         });
     } else {
@@ -50,30 +54,40 @@ router.post('/addItemRequest', function(req, res) {
 /************************************************
  * 修改物品
  ***********************************************/
- var updateItemCallback = function(req, res) {
-     return function (err, item) {
+var updateItemCallback = function (req, res) {
+    return function (err, item) {
         if (err) {
             logger.error(error.message.server.mongoUpdateError + err);
             return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
         } else if (item) {
-            item.user = req.loginUser;
-            return res.status(201).jsonp({ data: { item: item } });
+            User.populate(item, { path: 'user', select : Model.UserFieldsForCli }, 
+                function (err, item) {
+                    if (err)
+                        logger.error(error.message.server.mongoQueryError + err);
+                    return res.status(201).jsonp({
+                        data: { item: item.toJSON({ versionKey: false }) }
+                    });
+            });
         }
     }
- }
+}
 //修改物品信息
 router.post('/modifyItem', global.checkSession, global.decryptOnRequest, function (req, res) {
+    logger.debug(req.body);
+    var itemId = req.body.itemId;
     var updateData = req.body;
     delete updateData.loginId;
     delete updateData.itemId;
-    updateData.updateTime = Date.now;
-    Item.findByIdAndUpdate(req.body.itemId, updateData, { new: true }, 
+    updateData.updateTime = Date.now();
+    Item.findOneAndUpdate({ _id: itemId, user: req.loginUser._id },
+        updateData, { new: true },
         updateItemCallback(req, res));
 });
 
 //使物品失效
 router.post('/disableItem', global.checkSession, global.decryptOnRequest, function (req, res) {
-    Item.findByIdAndUpdate(req.body.itemId, { disabled: true }, { new: true }, 
+    Item.findOneAndUpdate({ _id: req.body.itemId, user: req.loginUser._id }, 
+        { disabled: true, updateTime : Date.now() }, { new: true },
         updateItemCallback(req, res));
 });
 
@@ -90,7 +104,7 @@ router.get('/getItemDetail', function(req, res) {
                     logger.error(error.message.server.mongoQueryError + err);
                     return res.status(500).jsonp({errorMessage:error.message.client.databaseError});
                 } else if (item) {
-                    return res.status(200).jsonp({data:{item : item}});
+                    return res.status(200).jsonp({data:{item : item.toJSON({ versionKey: false })}});
                 }
             });
 	} else {
@@ -104,15 +118,15 @@ router.get('/getItemDetail', function(req, res) {
 function listCommonOperation(req, res, itemType) {
     var query = Item.find({ type: parseInt(itemType) });
     if (req.query.userId)
-        query.where('user').eq(req.query.userId);
+        query.where('user').equals(req.query.userId);
     else if (req.loginUser)
-        query.where('user').eq(req.loginUser._id);
+        query.where('user').equals(req.loginUser._id);
     else
         return res.status(400).jsonp({ errorMessage: error.object.fieldRequired });
     if (req.query.nextId)
         query.where('_id').gt(req.query.nextId);
     query.select(Model.ItemFieldsForCli);
-    query.sort('_id', 1).limit(parseInt(req.query.numPerPage));
+    query.sort({'_id': 1}).limit(parseInt(req.query.numPerPage));
     query.populate('user', Model.UserFieldsForCli);
     query.exec(function (err, items) {
         if (err) {
@@ -215,21 +229,51 @@ router.post('/removeItemFromFavorite', global.checkSession, global.decryptOnRequ
 
 //获取我收藏的物品列表
 router.get('/getMyFavoriteItemList', global.checkSession, global.decryptOnRequest, function(req, res) {
-    User.findById(req.loginUser._id, 'favorites').populate('favorites').exec(function(err, user) {
+    var getItemIds = function(next) {
+            User.findById(req.loginUser._id, 'favorites')
+        .exec(function(err, user) {
+            if (err) {
+                logger.error(error.message.server.mongoQueryError + err);
+                next(error.object.databaseError);
+                return res.status(500).jsonp({errorMessage:error.message.client.databaseError});
+            } else if (user) {
+                var startIdx = req.query.nextId 
+                    ? (_.findIndex(user.favorites, function(favorite) { 
+                        return favorite._id.toString() === req.query.nextId;}) + 1) 
+                    : 0;
+                var items = req.query.numPerPage
+                    ? _.slice(user.favorites, startIdx, startIdx + parseInt(req.query.numPerPage))
+                    : user.favorites;
+                next(null, items);
+            }
+        });
+    };
+    var getItems = function(itemIds, next) {
+        Item.find({_id:{$in:itemIds}}, Model.ItemFieldsForCli)
+            .populate('user', Model.UserFieldsForCli)
+            .exec(function(err, items) {
+                if (err) {
+                    logger.error(error.message.server.mongoQueryError + err);
+                    next(error.object.databaseError);
+                } else if (items) {
+                    next(null, items);                            
+                } else {
+                    next(error.object.itemNotFound);
+                }
+            });
+    }
+    async.waterfall([getItemIds, getItems], function(err, results) {
         if (err) {
-            logger.error(error.message.server.mongoQueryError + err);
-            return res.status(500).jsonp({errorMessage:error.message.client.databaseError});
-        } else if (user) {
-            var startIdx = _.findIndex(user.favorites, function(favorite) {
-                return favorite._id.toString() === req.query.nextId;
-            }) + 1;
-            var items = _.slice(user.favorites, startIdx, startIdx + parseInt(req.query.numPerPage));
-            return res.status(200).jsonp({data:{
-                nextId:items.slice(-1)[0]._id, 
-                pageCount:req.query.pageCount, 
-                itemList:items}});
+            return res.status(err.status).jsonp({errorMessage:err.errorMessage});
+        } else if (results) {
+            return res.status(200).jsonp({
+                data:{
+                    nextId:results.slice(-1)[0]._id, 
+                    pageCount:req.query.pageCount, 
+                    itemList:results
+                }});            
         }
-    });
+    })
 });
 
 module.exports = router;

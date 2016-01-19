@@ -1,0 +1,3 @@
+{
+    "loginSignAlg" : { "algorithm": "RS256" }
+}

@@ -10,6 +10,3 @@ redisClient.on("error", function (error) {
 });
 
 module.exports.redis = redisClient;
-
-
-

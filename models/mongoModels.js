@@ -64,7 +64,7 @@ module.exports = {
     Comment : mongoose.model('comments', CommentSchema),
     UserFieldsForCli : '_id userName email phone regionCode introduce avator createdAt',
     ItemFieldsForCli : '_id name type disable categoryId secondCategoryId conditionId' 
-        + ' regionCode descriptionContent price addTime updateTime images',
+        + ' regionCode descriptionContent price addTime updateTime user images',
 };
 
 var mongoCollections = ['users','items','comments'];

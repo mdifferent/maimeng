@@ -8,9 +8,9 @@ var db = require('./db');
 var logger = require('log4js').getLogger("user");
 var error = require('./error');
 var global = require('./global');
-var ObjectId = require('mongodb').ObjectId;
 var Model = require('../models/mongoModels');
 var User = require('../models/mongoModels').User;
+var security = require('../config/securityKeys');
 
 //用户登录
 router.post('/login', function (req, res) {
@@ -20,11 +20,12 @@ router.post('/login', function (req, res) {
                         password: req.body.password };                  
     //读取用户数据
     var checkAccount = function (next) {
-      User.findOne(queryFilter).select(Model.UserFieldsForCli).exec(function(err, user) {
+      User.findOne(queryFilter).select(Model.UserFieldsForCli).exec(function(err, user) {         
           if (err) {
             logger.error(exports.message.server.mongoQueryError + err);
             next(error.object.databaseError);
           } else if (user) {
+            logger.debug('User:' + user);
             next(null, user);
           } else {
             next(error.object.userNotFound);
@@ -35,16 +36,20 @@ router.post('/login', function (req, res) {
     var generateToken = function (user, next) {
       var md5 = crypto.createHash('md5');
       //RandomKey生成格式：MD5(用户名+登录时间+IP)
-      logger.debug(Date.now().toString());
       md5.update(user.userName + Date.now().toString() + req.ip);
       var randomKey = md5.digest('hex');
-      jwt.sign(user, randomKey, function(token) {
-          next(null, user, token, randomKey);
-      });
+      logger.debug('Random key:' + randomKey);
+      logger.debug('User:' + user);
+      var token = jwt.sign(user.toJSON(), randomKey);
+      logger.debug('Token:' + token);
+      next(null, user, token, randomKey);
     };
     //记录登录状态
     var recordLoginStatus = function(user, token, key, next) {
-      db.redis.hmset(token, 'key', key, 'user', user, function (err, res) {
+      //Redis的key存储MD5(token)
+      var md5 = crypto.createHash('md5');
+      md5.update(token);
+      db.redis.hmset(md5.digest('hex'), 'key', key, /*'user', user,*/ function (err, res) {
         if (err)
           next(error.object.databaseError);
         else
@@ -65,9 +70,12 @@ router.post('/login', function (req, res) {
 });
 
 //用户登出
-router.post('/logout', function (req, res) {
+router.post('/logout', global.checkSession, function (req, res) {
     if (req.body.loginId && req.loginUser) {
-        db.redis.del(req.body.loginId, function (err, result) {
+        var token = req.body.loginId;
+        var md5 = crypto.createHash('md5');
+        md5.update(token);
+        db.redis.del(md5.digest('hex'), function (err, result) {
             if (err) {
                 logger.error(error.message.server.redisWriteError + err);
                 return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
@@ -104,7 +112,7 @@ router.post('/register', function (req, res) {
                 logger.error(exports.message.server.mongoInsertError + err);
                 next(error.object.databaseError, null);
             } else if (user) {
-                //logger.debug(result);
+                logger.debug(user);
                 next(null, user);
             } else {
                 next(error.object.databaseError, null);
@@ -115,8 +123,9 @@ router.post('/register', function (req, res) {
       if (err) {
         return res.status(err.status).jsonp({ errorMessage: result.errorMessage });
       } else if (result) {
-        delete result[1].password;
-        return res.status(201).jsonp({data:result[1]});
+        var user = result[1].toJSON({versionKey : false});
+        delete user.password;
+        return res.status(201).jsonp({data:{user : user}});
       }
     };
     async.series([checkUserExist, createAccount], callback);
@@ -142,15 +151,15 @@ router.post('/modifyPassword', global.checkSession, function (req, res) {
         var oldPasswordHash = req.body.oldPassword;
         var newPasswordHash = req.body.password;  //TODO : server side crypto
         User.findOneAndUpdate(
-            { _id: ObjectId(req.loginUser._id), password: oldPasswordHash },
-            { password: newPasswordHash,  },
-            { new: true, select: 'userName email phone regionCode introduce avator createdAt' },
+            { _id: req.loginUser._id, password: oldPasswordHash },
+            { password: newPasswordHash, lastModified: Date.now() },
+            { new: true, select: Model.UserFieldsForCli },
             function (err, user) {
                 if (err) {
                     logger.error(error.message.internal.mongoUpdateError + err);
                     return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
                 } else if (user) {
-                    return res.status(201).jsonp({ data: { user: user } });
+                    return res.status(201).jsonp({ data: { user: user.toJSON() } });
                 }
             });
     } else {
@@ -161,13 +170,12 @@ router.post('/modifyPassword', global.checkSession, function (req, res) {
 //用户更改简介
 router.post('/modifyIntroduce', global.checkSession, function (req, res) {
     if (req.body.introduce) {
-        User.findOneAndUpdate(
-            { _id: ObjectId(req.loginUser._id) },
-            { introduce : req.body.introduce, lastModified: Date.now },
-            { new: true, select: 'userName email phone regionCode introduce avator createdAt' },
+        User.findByIdAndUpdate(req.loginUser._id,
+            { introduce : req.body.introduce, lastModified: Date.now() },
+            { new: true, select: Model.UserFieldsForCli },
             function (err, user) {
                 if (err) {
-                    logger.error(error.message.internal.mongoUpdateError + err);
+                    logger.error(error.message.server.mongoUpdateError + err);
                     return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
                 } else if (user) {
                     return res.status(201).jsonp({ data: { user : user } });
@@ -185,8 +193,7 @@ router.post('/modifyAvator', global.checkSession, function (req, res) {
 
 //用户详细信息
 router.get('/getUserDetail', function (req, res) {
-    User.findById(req.query.userId, 
-        'userName email phone regionCode introduce avator createdAt', 
+    User.findById(req.query.userId, Model.UserFieldsForCli, 
         function(err, user) {
             if (err) {
                 logger.error(exports.message.server.mongoQueryError + err);
@@ -196,7 +203,7 @@ router.get('/getUserDetail', function (req, res) {
             } else {
                 return res.status(404).jsonp({ errorMessage: error.message.client.userNotFound });
             }
-        });
+    });
 });
 
 module.exports = router;

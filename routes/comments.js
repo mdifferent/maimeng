@@ -4,9 +4,7 @@ var async = require('async');
 var _ = require('lodash');
 var global = require('./global');
 var error = require('./error');
-//var db = require('./db');
 var logger = require('log4js').getLogger("comment");
-var ObjectId = require('mongodb').ObjectId;
 var Model = require('../models/mongoModels');
 var Comment = require('../models/mongoModels').Comment;
 var User = require('../models/mongoModels').User;
@@ -21,11 +19,11 @@ router.post('/addItemComment', global.checkSession, global.decryptOnRequest, fun
             user : req.loginUser._id,
             item : req.body.itemId
         };
-        Comment.save(data, function(err, comment, numAffected) {
+        Comment.create(data, function(err, comment) {
             if (err) {
                 logger.error(error.message.server.mongoInsertError + err);
                 next(error.object.databaseError);
-            } else if (numAffected > 0 && comment) {
+            } else if (comment) {
                 comment.user = req.loginUser;
                 next(null, comment);
             }
@@ -33,13 +31,17 @@ router.post('/addItemComment', global.checkSession, global.decryptOnRequest, fun
 	};
     
     var appendItemObject = function(comment, next) {
-        Item.Item.populate(comment, { path: 'item' }, function (err, comment) {
-            if (err) {
-                
-            } else {
-                next(null, comment);
-            }
-        });
+        Item.populate(comment, { path: 'item', select:Model.ItemFieldsForCli }, 
+            function (err, comment) {
+                if (err) {
+                    
+                } else {
+                    User.populate(comment,{path:'item.user', select:Model.UserFieldsForCli},
+                        function(err, comment) {
+                            next(null, comment);
+                    });
+                }
+            });
     };
     //给该商品的发布者发送消息
     var addNoti = function (commentObj, next) {
@@ -72,7 +74,7 @@ router.post('/addItemComment', global.checkSession, global.decryptOnRequest, fun
 		if (err)
 			return res.status(err.status).json({ errorMessage: err.errorMessage });
 		else if (result) {
-            return res.status(201).jsonp({ data: { itemComment: result } });
+            return res.status(201).jsonp({ data: { itemComment: result.toJSON({versionKey : false}) } });
         }	
 	}
 	async.waterfall([addComment, appendItemObject, addNoti], callback);
@@ -96,7 +98,7 @@ router.get('/getItemCommentList', global.checkSession, global.decryptOnRequest, 
                 return res.status(200).jsonp({ data: { 
                     itemCommentList: comments, 
                     pageCount:req.query.pageCount,
-                    nextId: comments.slice(-1)._id.toString()  
+                    nextId: comments.slice(-1)[0]._id.toString()  
                 } });
             }
         });
