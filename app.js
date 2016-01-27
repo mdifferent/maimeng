@@ -12,6 +12,7 @@ var multer = require('multer');
 var config = require('./config/db.json');
 var error = require('./routes/error');
 var logger = require('log4js').getLogger("app");
+var redis = require('./routes/db').redis;
 
 //Routers
 var routes = require('./routes');
@@ -54,7 +55,8 @@ app.use(function(req, res, next) {
    if (token) {
        var md5 = crypto.createHash('md5');
        md5.update(token);
-       require('./routes/db').redis.hget(md5.digest('hex'), "key", function(err, key) {
+       var hashedToken = md5.digest('hex');
+       redis.hget(hashedToken, "key", function(err, key) {
            if (err) {
                res.status(400).jsonp({errorMessage:error.message.client.sessionTimeout});
                log.error(error.message.server.redisReadError + err);

@@ -9,70 +9,98 @@ var error = require('./error');
 var Model = require('../models/mongoModels');
 var Item = require('../models/mongoModels').Item;
 var User = require('../models/mongoModels').User;
+var redis = require('./db').redis;
+var dbConfig = require('../config/db')
 
 /************************************************
  * 发布物品
  ***********************************************/
-function addItemCommon(req, res, itemType) {
+function addItemCommon(req, res, next) {
     if (req.body.name && req.body.price) {
         var data = req.body;
         delete data.loginId;
         data.user = req.loginUser._id;
-        data.type = itemType;
         data.disable = false;
         Item.create(data, function (err, item) {
             if (err) {
                 logger.error(error.message.server.mongoInsertError + err);
-                return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
+                res.status(500).jsonp({ errorMessage: error.message.client.databaseError })
             } else if (item) {
-                User.populate(item, { path: 'user', select : Model.UserFieldsForCli }, 
+                User.populate(item, { path: 'user', select: Model.UserFieldsForCli },
                     function (err, item) {
-                        if (err) 
+                        if (err)
                             logger.error(error.message.server.mongoQueryError + err);
-                        return res.status(201).jsonp({
-                            data: { item: item.toJSON({ versionKey: false }) }
-                        });
-                });
+                        res.status(201).jsonp({ data: { 
+                            item: item.toJSON({ versionKey: false }),
+                            itemId: item.id()
+                        } })
+                        next();
+                    });
             }
         });
     } else {
-        return res.status(400).jsonp({ errorMessage: error.message.client.fieldRequired });
+        res.status(400).jsonp({ errorMessage: error.message.client.fieldRequired })
+        next();
     }
 }
 
+function cacheItem(req, res, next) {
+    var listName = req.body.itemType == global.itemType.forBuy
+        ? 'latestBuyList' : 'latestSellList'
+    if (redis.llen(listName) === dbConfig.cacheListMaxLen)
+        redis.rpop(listName)
+    redis.lpush(listName, res.body.data.itemId)
+    redis.set(res.body.data.itemId, res.body.data.item)
+    redis.expire(res.body.data.itemId, 24 * 3600)
+    next()
+}
+
 //发布物品
-router.post('/addItem', global.checkSession, global.decryptOnRequest, function(req, res) {
-    addItemCommon(req,res,global.itemType.forSell);
-});
+router.post('/addItem', global.checkSession, global.decryptOnRequest, function (req, res, next) {
+    req.body.itemType = global.itemType.forSell
+    addItemCommon(req, res, next)
+}, cacheItem);
 
 //发布求物
-router.post('/addItemRequest', function(req, res) {
-    addItemCommon(req,res,global.itemType.forBuy);
-});
+router.post('/addItemRequest', function (req, res, next) {
+    req.body.itemType = global.itemType.forBuy
+    addItemCommon(req, res, next)
+}, cacheItem);
 
 
 /************************************************
  * 修改物品
  ***********************************************/
-var updateItemCallback = function (req, res) {
+function updateItemCallback (req, res, next) {
     return function (err, item) {
         if (err) {
             logger.error(error.message.server.mongoUpdateError + err);
-            return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
+            res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
         } else if (item) {
             User.populate(item, { path: 'user', select : Model.UserFieldsForCli }, 
                 function (err, item) {
                     if (err)
                         logger.error(error.message.server.mongoQueryError + err);
-                    return res.status(201).jsonp({
-                        data: { item: item.toJSON({ versionKey: false }) }
-                    });
+                    res.status(201).jsonp({data: { item: item.toJSON({ versionKey: false }) }});
+                    next()
             });
         }
     }
 }
+
+//更新缓存中的物品信息
+function updateItemCache(req, res, next) {
+    if (res.status === 201 && res.body.data) {
+        if (redis.exists(req.body.itemId)) {
+            redis.set(req.body.itemId, res.body.data.item)
+            redis.expire(req.body.itemId, dbConfig.itemCacheTime)
+        }
+    }
+    next()
+}
+
 //修改物品信息
-router.post('/modifyItem', global.checkSession, global.decryptOnRequest, function (req, res) {
+router.post('/modifyItem', global.checkSession, global.decryptOnRequest, function (req, res, next) {
     logger.debug(req.body);
     var itemId = req.body.itemId;
     var updateData = req.body;
@@ -81,20 +109,34 @@ router.post('/modifyItem', global.checkSession, global.decryptOnRequest, functio
     updateData.updateTime = Date.now();
     Item.findOneAndUpdate({ _id: itemId, user: req.loginUser._id },
         updateData, { new: true },
-        updateItemCallback(req, res));
-});
+        updateItemCallback(req, res, next));
+}, updateItemCache);
 
 //使物品失效
 router.post('/disableItem', global.checkSession, global.decryptOnRequest, function (req, res) {
     Item.findOneAndUpdate({ _id: req.body.itemId, user: req.loginUser._id }, 
         { disabled: true, updateTime : Date.now() }, { new: true },
         updateItemCallback(req, res));
+    redis.del(req.body.itemId)
 });
 
 /************************************************
  * 获取物品信息
  ***********************************************/
-router.get('/getItemDetail', function(req, res) {
+//尝试从缓存中获取物品信息
+function checkCache(req, res, next) {
+    if (req.query.itemId) {
+        var item = redis.get(req.query.itemId)
+        if (item)
+            return req.status(200).jsonp({data:{item:item}})
+        else
+            next()
+    } else {
+		return res.status(400).jsonp({errorMessage:'缺少itemId'});
+	}
+}
+
+router.get('/getItemDetail', checkCache, function(req, res) {
 	if (req.query.itemId) {
 		Item.findById(req.query.itemId)
             .select(Model.ItemFieldsForClie)

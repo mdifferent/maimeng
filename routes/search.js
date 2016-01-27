@@ -1,10 +1,18 @@
-var express = require('express');
-var router = express.Router();
-var global =  require('./global');
-var db = require('./db');
-var mongo = db.mongo;
+var express = require('express')
+   ,router = express.Router()
+   ,global =  require('./global')
+   ,logger = require('log4js').getLogger("item")
+   ,Item = require('../models/mongoModels').Item
 
 function searchItemCommon(req, res, itemType) {
+    Item.search({
+        query_string: {
+            query: req.query.keyword
+        }
+    }, function(err, result) {
+        
+    });
+    /*
 	mongo.collection('items')
 		.find({type : itemType, disable : 0, _id : {$gt:req.query.nextId}, $text : { $search: req.query.keyword } },
 				{ score : { $meta: "textScore" } })
@@ -17,7 +25,7 @@ function searchItemCommon(req, res, itemType) {
 			} else if (docs) {
 				return res.status(200).json({data:{itemList:docs,nextId:docs.slice(-1)._id,pageCount:req.query.pageCount}});
 			}					
-		});
+		});*/
 }
 //搜索物品
 router.get('searchItem', function(req, res) {

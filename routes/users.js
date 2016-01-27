@@ -49,11 +49,14 @@ router.post('/login', function (req, res) {
       //Redis的key存储MD5(token)
       var md5 = crypto.createHash('md5');
       md5.update(token);
-      db.redis.hmset(md5.digest('hex'), 'key', key, /*'user', user,*/ function (err, res) {
+      var hashedToken = md5.digest('hex')
+      db.redis.hmset(hashedToken, 'key', key, /*'user', user,*/ function (err, res) {
         if (err)
           next(error.object.databaseError);
-        else
-          next(null, { user: user, loginId: token });
+        else {
+            db.redis.expire(hashedToken, 60 * 60 * 24)
+            next(null, { user: user, loginId: token });
+        }
       });
     };
     var callback = function (err, result) {

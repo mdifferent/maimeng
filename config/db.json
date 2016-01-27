@@ -1,12 +1,19 @@
 {
-    "port" : 3000,
-    "mongoUrl" : "mongodb://10.128.84.20:27017/test",
-    "mongoConfig" : {
+    "port": 3000,
+    "mongoUrl": "mongodb://10.128.84.20:27017/test",
+    "mongoConfig": {
         "db": {},
-        "server": { "poolSize": 5 },
+        "server": {
+            "poolSize": 5
+        },
         "replSet": {},
         "mongos": {}
     },
-    "redisServer" : "10.128.84.31",
-    "redisPort" : "6379"
+    "redisServer": "10.128.84.31",
+    "redisPort": "6379",
+    "elasticsearch": {
+        "host": "localhost:9200"
+    },
+    "cacheListMaxLen" : 50,
+    "itemCacheTime" : 86400
 }

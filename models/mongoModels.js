@@ -1,8 +1,13 @@
-var mongoose = require('mongoose');
-var logger = require('log4js').getLogger("db");
-var _ = require('lodash');
-var config = require('../config/db.json');
+var mongoose = require('mongoose')
+   ,mongoosastic = require('mongoosastic')
+   ,elasticsearch = require('elasticsearch')
+   ,_ = require('lodash')
+   ,logger = require('log4js').getLogger("db")
+   ,config = require('../config/db.json')
+   
 var db = mongoose.connection;
+var Schema = mongoose.Schema;
+var esClient = new elasticsearch.Client(config.elasticsearch);
 mongoose.connect(config.mongoUrl, config.mongoConfig);
 db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', function() {
@@ -10,7 +15,7 @@ db.once('open', function() {
     logger.info('MongoDB check collections...' + config.mongoUrl);
     checkCollections();
 });
-var Schema = mongoose.Schema;
+
 
 var ImageSchema = new Schema({
     id:                     String,
@@ -39,7 +44,7 @@ var UserSchema = new Schema({
 });
 
 var ItemSchema = new Schema({
-    name:                   String,
+    name:                   { type:String, es_indexed:true },
     type:                   Number,
     disabled:               Boolean,
     regionCode:             Number,
@@ -50,6 +55,10 @@ var ItemSchema = new Schema({
     user:                   { type: Schema.Types.ObjectId, ref: 'users' },
     images:                 [ImageSchema]
 });
+
+ItemSchema.plugin(mongoosastic, {
+  esClient: esClient
+})
 
 var CommentSchema = new Schema({
     content:                String,
