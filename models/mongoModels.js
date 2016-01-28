@@ -53,7 +53,8 @@ var ItemSchema = new Schema({
     addTime:                { type: Date, default: Date.now },
     updateTime:             { type: Date, default: Date.now },
     user:                   { type: Schema.Types.ObjectId, ref: 'users' },
-    images:                 [ImageSchema]
+    images:                 [ImageSchema],
+    visitCount:             { type: Number, default: 0 },
 });
 
 ItemSchema.plugin(mongoosastic, {

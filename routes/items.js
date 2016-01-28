@@ -136,22 +136,23 @@ function checkCache(req, res, next) {
 	}
 }
 
-router.get('/getItemDetail', checkCache, function(req, res) {
-	if (req.query.itemId) {
-		Item.findById(req.query.itemId)
-            .select(Model.ItemFieldsForClie)
+router.get('/getItemDetail', checkCache, function (req, res) {
+    if (req.query.itemId) {
+        Item.findByIdAndUpdate(req.query.itemId,
+            { $inc: { visitCount: 1 } },
+            { new: true, select: Model.ItemFieldsForClie })
             .populate('user', Model.UserFieldsForCli)
-            .exec(function(err, item) {
+            .exec(function (err, item) {
                 if (err) {
                     logger.error(error.message.server.mongoQueryError + err);
-                    return res.status(500).jsonp({errorMessage:error.message.client.databaseError});
+                    return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
                 } else if (item) {
-                    return res.status(200).jsonp({data:{item : item.toJSON({ versionKey: false })}});
+                    return res.status(200).jsonp({ data: { item: item.toJSON({ versionKey: false }) } });
                 }
             });
-	} else {
-		return res.status(400).jsonp({errorMessage:'缺少itemId'});
-	}
+    } else {
+        return res.status(400).jsonp({ errorMessage: '缺少itemId' });
+    }
 });
 
 /************************************************
