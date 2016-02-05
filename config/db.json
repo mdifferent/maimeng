@@ -12,7 +12,7 @@
     "redisServer": "10.128.84.31",
     "redisPort": "6379",
     "elasticsearch": {
-        "host": "localhost:9200"
+        "host": "10.58.121.253:9200"
     },
     "cacheListMaxLen" : 50,
     "itemCacheTime" : 86400

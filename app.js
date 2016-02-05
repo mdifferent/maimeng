@@ -14,6 +14,7 @@ var error = require('./routes/error');
 var logger = require('log4js').getLogger("app");
 var redis = require('./routes/db').redis;
 
+
 //Routers
 var routes = require('./routes');
 var users = require('./routes/users');
