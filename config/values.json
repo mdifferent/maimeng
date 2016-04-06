@@ -1,0 +1,8 @@
+{
+    "TOP_BUY_LIST_KEY":"topBuyList",
+    "TOP_SELL_LIST_KEY":"topSellList",
+    "LATEST_BUY_LIST_KEY":"latestBuyList",
+    "LATEST_SELL_LIST_KEY":"latestSellList",
+    "TO_SELL" : 0,
+    "TO_BUY" : 1    
+}

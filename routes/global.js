@@ -67,5 +67,3 @@ module.exports = {
         },
     }
 };
-
-module.exports.itemType = { forSell: 0, forBuy: 1 };

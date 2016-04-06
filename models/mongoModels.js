@@ -1,22 +1,10 @@
-var mongoose = require('mongoose')
-   ,mongoosastic = require('mongoosastic')
-   ,elasticsearch = require('elasticsearch')
-   ,_ = require('lodash')
-   ,logger = require('log4js').getLogger("db")
-   ,config = require('../config/db.json')
-   
-var db = mongoose.connection;
+var mongoose = require('mongoose'),
+    mongoosastic = require('mongoosastic'),
+    _ = require('lodash'),
+    logger = require('log4js').getLogger("db"),
+    db = require('../routes/db')
+
 var Schema = mongoose.Schema;
-var esClient = new elasticsearch.Client(config.elasticsearch);
-mongoose.connect(config.mongoUrl, config.mongoConfig);
-db.on('error', console.error.bind(console, 'connection error:'));
-db.once('open', function() {
-    logger.info('MongoDB connect success : ' + config.mongoUrl);
-    logger.info('MongoDB check collections...' + config.mongoUrl);
-    checkCollections();
-});
-
-
 var ImageSchema = new Schema({
     id:                     String,
 });
@@ -29,10 +17,11 @@ var NotificationSchema = new Schema({
     comment:                { type: Schema.Types.ObjectId, ref: 'comments' },
 });
 
+//User model define
 var UserSchema = new Schema({
-    userName:                String,
+    userName:                { type: String, index: { unique: true } },
     password:                String,
-    email:                   String,
+    email:                   { type: String, index: { unique: true } },
     phone:                   String,
     regionCode:              Number,
     introduce:               String,
@@ -42,51 +31,68 @@ var UserSchema = new Schema({
     notifications:           [NotificationSchema],
     favorites:               [{ type: Schema.Types.ObjectId, ref: 'items' }]
 });
+var UserModel = mongoose.model('users', UserSchema)
 
+//Item model define
 var ItemSchema = new Schema({
-    name:                   { type:String, es_indexed:true },
-    type:                   Number,
+    name:                   { type:String, es_indexed: true },
+    type:                   { type:Number, es_indexed: true },
     disabled:               Boolean,
-    regionCode:             Number,
+    regionCode:             { type:Number, es_indexed: true },
+    f2f:                    { type:Boolean, default: false },
+    sameCity:               { type:Boolean, default: false },
     descriptionContent:     String,
     price:                  Number,
     addTime:                { type: Date, default: Date.now },
     updateTime:             { type: Date, default: Date.now },
     user:                   { type: Schema.Types.ObjectId, ref: 'users' },
-    images:                 [ImageSchema],
+    images:                 { type: [ImageSchema], es_indexed: false },
     visitCount:             { type: Number, default: 0 },
 });
 
 ItemSchema.plugin(mongoosastic, {
-  esClient: esClient
+    index: "items",
+    type: "itemName",
+    bulk: {
+        size: 10, // preferred number of docs to bulk index
+        delay: 1000 //milliseconds to wait for enough docs to meet size constraint
+    },
+    esClient : db.esClient,
+    curlDebug: true,
+    hydrate: true,
+    hydrateOptions: {
+        lean: true
+    }
 })
 
+var ItemModel = mongoose.model('items', ItemSchema)
+
+ItemModel.createMapping(function (err, mapping) {
+    if (err) {
+        logger.error('error creating mapping (you can safely ignore this)');
+        logger.error(err);
+    } else {
+        logger.info('mapping created!');
+        logger.info(mapping);
+    }
+})
+
+//Comment model define
 var CommentSchema = new Schema({
     content:                String,
     addTime:                { type:Date, default: Date.now },
     item:                   { type: Schema.Types.ObjectId, ref: 'items' },
     user:                   { type: Schema.Types.ObjectId, ref: 'users' }
-});
+})
+
+var CommentModel = mongoose.model('comments', CommentSchema)
 
 module.exports = {
-    User : mongoose.model('users', UserSchema),
-    Item : mongoose.model('items', ItemSchema),
-    Comment : mongoose.model('comments', CommentSchema),
+    User : UserModel,
+    Item : ItemModel,
+    Comment : CommentModel,
     UserFieldsForCli : '_id userName email phone regionCode introduce avator createdAt',
     ItemFieldsForCli : '_id name type disable categoryId secondCategoryId conditionId' 
         + ' regionCode descriptionContent price addTime updateTime user images',
 };
 
-var mongoCollections = ['users','items','comments'];
-function checkCollections(next) {
-    db.db.listCollections().toArray(function(err, cols) {
-        _.each(mongoCollections, function(colName) {
-            if (_.find(cols, {'name': colName})) {
-                logger.info(colName + ' found');
-            } else {
-                db.db.collection(colName);
-                logger.info(colName + ' created');
-            }
-        })
-    });
-}

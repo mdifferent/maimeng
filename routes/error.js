@@ -9,8 +9,8 @@ module.exports.message = {
 		tokenRequired : '缺少loginId',
 		usernameExist : '用户名已存在',
 		userNotFound : '未找到该用户',
-        notYours : '没有该操作的权限'
-    
+        notYours : '没有该操作的权限',
+        wrongPassword: '密码错误'
 	}, 
 	
 	server : {
@@ -31,6 +31,8 @@ module.exports.object = {
     userNotFound : {status:404, errorMessage: '未找到该用户'},
     userNameDuplicate : {status:400, errorMessage: '用户名或email已被使用'},
     itemNotFound : {status:404, errorMessage: '未找到该商品'},
-    notYours:{status:403, errorMessage: '没有该操作权限'}
+    notYours:{status:403, errorMessage: '没有该操作权限'},
+    duplicateFavor: {status:400, errorMessage: '已经收藏过了'},
+    favorNotExist: {status:400, errorMessage: '未收藏该物品'}
 };
 

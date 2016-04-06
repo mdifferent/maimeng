@@ -1,6 +1,6 @@
 {
     "port": 3000,
-    "mongoUrl": "mongodb://10.128.84.20:27017/test",
+    "mongoUrl": "mongodb://10.58.121.253:27017/test",
     "mongoConfig": {
         "db": {},
         "server": {
@@ -9,11 +9,14 @@
         "replSet": {},
         "mongos": {}
     },
-    "redisServer": "10.128.84.31",
+    "redisServer": "10.58.121.253",
     "redisPort": "6379",
     "elasticsearch": {
-        "host": "10.58.121.253:9200"
+        "host": "10.58.121.253:9200",
+        "hostname":"10.58.121.253",
+        "port":9200
     },
     "cacheListMaxLen" : 50,
+    "loginSessionLife" : 86400,
     "itemCacheTime" : 86400
 }

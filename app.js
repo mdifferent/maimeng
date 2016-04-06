@@ -12,8 +12,7 @@ var multer = require('multer');
 var config = require('./config/db.json');
 var error = require('./routes/error');
 var logger = require('log4js').getLogger("app");
-var redis = require('./routes/db').redis;
-
+var db = require('./routes/db');
 
 //Routers
 var routes = require('./routes');
@@ -51,13 +50,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 // login check
 app.use(function(req, res, next) {
    //logger.debug(req); 
-   var token = req.body.loginId ? req.body.loginId : req.query.loginId;
-   logger.debug(token);
+   var token = req.body.loginId || req.query.loginId;
+   //logger.debug("App token:", token);
    if (token) {
        var md5 = crypto.createHash('md5');
        md5.update(token);
        var hashedToken = md5.digest('hex');
-       redis.hget(hashedToken, "key", function(err, key) {
+       //logger.debug(hashedToken)
+       db.redis.hget(hashedToken, "key", function(err, key) {
            if (err) {
                res.status(400).jsonp({errorMessage:error.message.client.sessionTimeout});
                log.error(error.message.server.redisReadError + err);
@@ -112,7 +112,6 @@ app.use(function(err, req, res, next) {
     error: {}
   });
 });
-
 
 app.use('/', routes);
 app.use('/User', users);

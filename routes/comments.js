@@ -12,14 +12,14 @@ var Item = require('../models/mongoModels').Item;
 
 //为物品添加评论
 router.post('/addItemComment', global.checkSession, global.decryptOnRequest, function (req, res) {
-	//给商品添加评论
+    //给商品添加评论
     var addComment = function (next) {
-		var data = {
-            content : req.body.content,
-            user : req.loginUser._id,
-            item : req.body.itemId
+        var data = {
+            content: req.body.content,
+            user: req.loginUser._id,
+            item: req.body.itemId
         };
-        Comment.create(data, function(err, comment) {
+        Comment.create(data, function (err, comment) {
             if (err) {
                 logger.error(error.message.server.mongoInsertError + err);
                 next(error.object.databaseError);
@@ -28,18 +28,21 @@ router.post('/addItemComment', global.checkSession, global.decryptOnRequest, fun
                 next(null, comment);
             }
         });
-	};
-    
-    var appendItemObject = function(comment, next) {
-        Item.populate(comment, { path: 'item', select:Model.ItemFieldsForCli }, 
+    };
+
+    var appendItemObject = function (comment, next) {
+        Item.populate(comment, { path: 'item', select: Model.ItemFieldsForCli },
             function (err, comment) {
                 if (err) {
-                    
+                    logger.error(error.message.server.mongoQueryError + err);
                 } else {
-                    User.populate(comment,{path:'item.user', select:Model.UserFieldsForCli},
-                        function(err, comment) {
-                            next(null, comment);
-                    });
+                    User.populate(comment, { path: 'item.user', select: Model.UserFieldsForCli },
+                        function (err, comment) {
+                            if (err) {
+                                logger.error(error.message.server.mongoQueryError + err);
+                            }
+                            next(null, comment)
+                        });
                 }
             });
     };
@@ -70,20 +73,20 @@ router.post('/addItemComment', global.checkSession, global.decryptOnRequest, fun
             }
         });
     };
-	var callback = function (err, result) {
-		if (err)
-			return res.status(err.status).json({ errorMessage: err.errorMessage });
-		else if (result) {
-            return res.status(201).jsonp({ data: { itemComment: result.toJSON({versionKey : false}) } });
-        }	
-	}
-	async.waterfall([addComment, appendItemObject, addNoti], callback);
+    var callback = function (err, result) {
+        if (err)
+            return res.status(err.status).json({ errorMessage: err.errorMessage });
+        else if (result) {
+            return res.status(201).jsonp({ data: { itemComment: result.toJSON({ versionKey: false }) } });
+        }
+    }
+    async.waterfall([addComment, appendItemObject, addNoti], callback);
 });
 
 //获取物品的评论/回复列表
 router.get('/getItemCommentList', global.checkSession, global.decryptOnRequest, function (req, res) {
     if (req.query.itemId) {
-        var query = Comment.find({ itemId: req.query.itemId })
+        var query = Comment.find({ item: req.query.itemId })
             .sort({ addTime: 1 })
             .limit(parseInt(req.query.numPerPage))
             .populate('item', Model.ItemFieldsForCli)
@@ -94,12 +97,24 @@ router.get('/getItemCommentList', global.checkSession, global.decryptOnRequest, 
             if (err) {
                 logger.error(error.message.server.mongoQueryError + err);
                 return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
-            } else if (comments) {
-                return res.status(200).jsonp({ data: { 
-                    itemCommentList: comments, 
-                    pageCount:req.query.pageCount,
-                    nextId: comments.slice(-1)[0]._id.toString()  
-                } });
+            } else if (comments && comments.length > 0) {
+                comments.forEach(function(comment) {
+                    comment.item.user = comment.user
+                    comment.user = undefined
+                })
+                return res.status(200).jsonp({ 
+                    data: { 
+                        itemCommentList: comments, 
+                        pageCount:req.query.pageCount,
+                        nextId: comments.slice(-1)._id
+                    } });
+            } else {
+                return res.status(200).jsonp({
+                    data: {
+                        itemCommentList: [],
+                        pageCount:req.query.pageCount,
+                        nextId: ""
+                    }})
             }
         });
     } else {
