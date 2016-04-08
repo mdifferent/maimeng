@@ -55,26 +55,39 @@ var initOps = {
             callback(error)
         })
         callback(null, redisClient)
-    }],
+    }],/*
     connectElasticSearch: ['connectMongo', function (callback) {
         var esClient = new elasticsearch.Client({
             host: config.elasticsearch.host
         })
-        callback(null, esClient)
-    }]
+        esClient.ping({
+            // ping usually has a 3000ms timeout 
+            requestTimeout: Infinity,
+            // undocumented params are appended to the query string 
+            hello: "elasticsearch!"
+        }, function (error) {
+            if (error) {
+                logger.error('elasticsearch cluster is down!');
+                callback(error)
+            } else {
+                callback(null, esClient)
+            }
+        });
+        
+    }]*/
 }
 
 async.auto(initOps, function (err, results) {
     if (err)
         logger.error('DB init error:', err);
     else if (results) {
-        logger.info("All db connected:",
-            results.connectMongo != undefined &&
-            results.connectRedis != undefined &&
-            results.connectElasticSearch != undefined)
+        logger.info("All db connected:", results.connectMongo != undefined 
+            && results.connectRedis != undefined 
+            //&& results.connectElasticSearch != undefined
+        )
         module.exports.mongo = results.connectMongo
         module.exports.redis = results.connectRedis
-        module.exports.es = results.connectElasticSearch
+        //module.exports.es = results.connectElasticSearch
     }
 })
 

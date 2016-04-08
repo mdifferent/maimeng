@@ -20,7 +20,7 @@ module.exports.message = {
 		mongoDeleteError : 'MongoDB delete error:',
 		redisReadError : 'Redis read error:',
 		redisWriteError : 'Redis write error:',
-		
+        elasticIndexError: 'Elasticsearch index error:'		
 	}
 };
 

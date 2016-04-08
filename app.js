@@ -15,7 +15,7 @@ var logger = require('log4js').getLogger("app");
 var db = require('./routes/db');
 
 //Routers
-var routes = require('./routes');
+//var routes = require('./routes');
 var users = require('./routes/users');
 var items = require('./routes/items');
 var comments = require('./routes/comments');
@@ -113,7 +113,7 @@ app.use(function(err, req, res, next) {
   });
 });
 
-app.use('/', routes);
+//app.use('/', routes);
 app.use('/User', users);
 app.use('/Item',items);
 app.use('/Comment',comments);

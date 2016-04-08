@@ -2,6 +2,7 @@ var mongoose = require('mongoose'),
     mongoosastic = require('mongoosastic'),
     _ = require('lodash'),
     logger = require('log4js').getLogger("db"),
+    config = require('../config/db.json'),
     db = require('../routes/db')
 
 var Schema = mongoose.Schema;
@@ -36,9 +37,9 @@ var UserModel = mongoose.model('users', UserSchema)
 //Item model define
 var ItemSchema = new Schema({
     name:                   { type:String, es_indexed: true },
-    type:                   { type:Number, es_indexed: true },
+    type:                   { type:Number, es_indexed: true, es_type: 'integer'},
     disabled:               Boolean,
-    regionCode:             { type:Number, es_indexed: true },
+    regionCode:             { type:Number, es_indexed: true, es_type: 'integer' },
     f2f:                    { type:Boolean, default: false },
     sameCity:               { type:Boolean, default: false },
     descriptionContent:     String,
@@ -50,6 +51,7 @@ var ItemSchema = new Schema({
     visitCount:             { type: Number, default: 0 },
 });
 
+
 ItemSchema.plugin(mongoosastic, {
     index: "items",
     type: "itemName",
@@ -57,7 +59,8 @@ ItemSchema.plugin(mongoosastic, {
         size: 10, // preferred number of docs to bulk index
         delay: 1000 //milliseconds to wait for enough docs to meet size constraint
     },
-    esClient : db.esClient,
+    hosts: [config.elasticsearch.host],
+    //esClient : db.esClient,
     curlDebug: true,
     hydrate: true,
     hydrateOptions: {

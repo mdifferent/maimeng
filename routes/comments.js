@@ -98,10 +98,6 @@ router.get('/getItemCommentList', global.checkSession, global.decryptOnRequest, 
                 logger.error(error.message.server.mongoQueryError + err);
                 return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
             } else if (comments && comments.length > 0) {
-                comments.forEach(function(comment) {
-                    comment.item.user = comment.user
-                    comment.user = undefined
-                })
                 return res.status(200).jsonp({ 
                     data: { 
                         itemCommentList: comments, 

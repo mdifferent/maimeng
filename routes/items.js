@@ -22,21 +22,41 @@ function addItemCommon(req, res, next) {
         data.loginId = undefined;
         data.user = req.loginUser._id;
         data.disable = false;
-        //logger.debug("addItemCommon", data)
+        /*
+        var newItem = new Item(data)
+        newItem.save(function (err) {
+            if (err) {
+                logger.error(error.message.server.mongoInsertError + err);
+                res.status(500).jsonp({ errorMessage: error.message.client.databaseError })
+            } else {
+                newItem.on('es-indexed', function (err, res) {
+                    if (err) {
+                        logger.error(error.message.server.mongoInsertError + err);
+                        res.status(500).jsonp({ errorMessage: error.message.client.databaseError })
+                    }
+                    next()
+                });
+            }
+        })*/
         Item.create(data, function (err, item) {
+            item.on('es-indexed', function(err, result) {
+                if (err)
+                    logger.error(err)
+                else
+                    logger.info("Item indexed:") 
+            });
             if (err) {
                 logger.error(error.message.server.mongoInsertError + err);
                 res.status(500).jsonp({ errorMessage: error.message.client.databaseError })
             } else if (item) {
                 User.populate(item, { path: 'user', select: Model.UserFieldsForCli },
                     function (err, item) {
-                        //logger.debug("Item:", item)
                         if (err)
                             logger.error(error.message.server.mongoQueryError + err);
                         res.status(201).jsonp({ data: { 
                             item: item.toJSON({ versionKey: false })
                         } })
-                        res.item = item.toJSON({ versionKey: false })
+                        res.item = item //used for caching
                         next();
                     });
             }
@@ -55,8 +75,8 @@ function cacheItem(req, res, next) {
     if (db.redis.llen(listName) === dbConfig.cacheListMaxLen)
         db.redis.rpop(listName)
     db.redis.multi()
-        .lpush(listName, res.item._id)
-        .setex(res.item._id, 24 * 3600, res.item)
+        .lpush(listName, res.item.id)
+        .setex(res.item.id, 24 * 3600, JSON.stringify(res.item.toJSON({ versionKey: false })))
         .exec(function(err, replies) {
             if (err) {
                 logger.error(error.message.server.redisWriteError + err);
@@ -65,6 +85,7 @@ function cacheItem(req, res, next) {
                 logger.info("Cache item info:" + replies[1])
             }
         })
+    delete res.item
     if (next)
         next()
 }
