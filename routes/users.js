@@ -117,13 +117,16 @@ router.post('/register', function (req, res) {
 
 
 var updateCommonCallback = function (res) {
-  return function (err, result) {
-    if (err) {
-      return res.status(err.status).jsonp({ errorMessage: result.errorMessage });
-    } else if (result) {
-      return res.status(201).jsonp({data:result[0]});
+    return function (err, user) {
+        if (err) {
+            logger.error(error.message.server.mongoUpdateError + err);
+            return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
+        } else if (user) {
+            return res.status(201).jsonp({ data: { user: user.toJSON() } });
+        } else {
+            return res.status(403).jsonp({ errorMessage: error.message.client.wrongPassword })
+        }
     }
-  }
 }
 
 //用户更改密码
@@ -135,16 +138,7 @@ router.post('/modifyPassword', global.checkSession, function (req, res) {
             { _id: req.loginUser._id, password: oldPasswordHash },
             { password: newPasswordHash, lastModified: Date.now() },
             { new: true, select: Model.UserFieldsForCli },
-            function (err, user) {
-                if (err) {
-                    logger.error(error.message.internal.mongoUpdateError + err);
-                    return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
-                } else if (user) {
-                    return res.status(201).jsonp({ data: { user: user.toJSON() } });
-                } else {
-                    return res.status(403).jsonp({ errorMessage: error.message.client.wrongPassword })
-                }
-            });
+            updateCommonCallback(res));
     } else {
         return res.status(400).jsonp({ errorMessage: error.message.fieldRequired });
     }
@@ -156,14 +150,7 @@ router.post('/modifyIntroduce', global.checkSession, function (req, res) {
         User.findByIdAndUpdate(req.loginUser._id,
             { introduce : req.body.introduce, lastModified: Date.now() },
             { new: true, select: Model.UserFieldsForCli },
-            function (err, user) {
-                if (err) {
-                    logger.error(error.message.server.mongoUpdateError + err);
-                    return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
-                } else if (user) {
-                    return res.status(201).jsonp({ data: { user : user.toJSON() } });
-                }
-            });
+            updateCommonCallback(res));
     } else {
         return res.status(400).jsonp({ errorMessage: error.message.fieldRequired });
     }
@@ -175,14 +162,7 @@ router.post('/modifyAvator', global.checkSession, function (req, res) {
         User.findByIdAndUpdate(req.loginUser._id,
             { avator: req.body.imageId },
             { new: true, select: Model.UserFieldsForCli },
-            function (err, user) {
-                if (err) {
-                    logger.error(error.message.server.mongoUpdateError + err);
-                    return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
-                } else if (user) {
-                    return res.status(201).jsonp({ data: { user: user.toJSON() } });
-                }
-            });
+            updateCommonCallback(res));
     } else {
         return res.status(400).jsonp({ errorMessage: error.message.fieldRequired });
     }

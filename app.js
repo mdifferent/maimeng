@@ -1,34 +1,34 @@
-var express = require('express');
-var path = require('path');
-var favicon = require('serve-favicon');
-var log4js = require('log4js');
-var jwt = require('jsonwebtoken');
-var crypto = require('crypto');
-var methodOverride = require('method-override');
-var session = require('express-session');
-var cookieParser = require('cookie-parser');
-var bodyParser = require('body-parser');
-var multer = require('multer');
-var config = require('./config/db.json');
-var error = require('./routes/error');
-var logger = require('log4js').getLogger("app");
-var db = require('./routes/db');
+var express = require('express'),
+    app = express(),
+    path = require('path'),
+    favicon = require('serve-favicon'),
+    log4js = require('log4js'),
+    jwt = require('jsonwebtoken'),
+    crypto = require('crypto'),
+    methodOverride = require('method-override'),
+    session = require('express-session'),
+    cookieParser = require('cookie-parser'),
+    bodyParser = require('body-parser'),
+    multer = require('multer'),
+    config = require('./config/db.json'),
+    error = require('./routes/error'),
+    logger = require('log4js').getLogger("app"),
+    db = require('./routes/db')
 
 //Routers
-//var routes = require('./routes');
-var users = require('./routes/users');
-var items = require('./routes/items');
-var comments = require('./routes/comments');
-var notifications = require('./routes/notifications');
-var category = require('./routes/category');
-var search = require('./routes/search');
-var image = require('./routes/image');
-var admin = require('./routes/admin');
+var index = require('./routes/index'),
+    users = require('./routes/users'),
+    items = require('./routes/items'),
+    comments = require('./routes/comments'),
+    notifications = require('./routes/notifications'),
+    category = require('./routes/category'),
+    search = require('./routes/search'),
+    image = require('./routes/image'),
+    admin = require('./routes/admin')
 
 var app = express();
 log4js.configure("./config/log4js.json");
 var log = log4js.getLogger("app");
-//require('./routes/db').init();
 
 // view engine setup
 app.set('port', process.env.PORT || config.port);
@@ -113,7 +113,7 @@ app.use(function(err, req, res, next) {
   });
 });
 
-//app.use('/', routes);
+app.use('/', index);
 app.use('/User', users);
 app.use('/Item',items);
 app.use('/Comment',comments);

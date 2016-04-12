@@ -60,8 +60,6 @@ ItemSchema.plugin(mongoosastic, {
         delay: 1000 //milliseconds to wait for enough docs to meet size constraint
     },
     hosts: [config.elasticsearch.host],
-    //esClient : db.esClient,
-    curlDebug: true,
     hydrate: true,
     hydrateOptions: {
         lean: true

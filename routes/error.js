@@ -33,6 +33,7 @@ module.exports.object = {
     itemNotFound : {status:404, errorMessage: '未找到该商品'},
     notYours:{status:403, errorMessage: '没有该操作权限'},
     duplicateFavor: {status:400, errorMessage: '已经收藏过了'},
-    favorNotExist: {status:400, errorMessage: '未收藏该物品'}
+    favorNotExist: {status:400, errorMessage: '未收藏该物品'},
+    noMoreItem: {status:200, errorMessage: '没有更多物品了'}
 };
 

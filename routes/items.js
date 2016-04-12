@@ -76,7 +76,7 @@ function cacheItem(req, res, next) {
         db.redis.rpop(listName)
     db.redis.multi()
         .lpush(listName, res.item.id)
-        .setex(res.item.id, 24 * 3600, JSON.stringify(res.item.toJSON({ versionKey: false })))
+        .setex(res.item.id, dbConfig.itemCacheTime, JSON.stringify(res.item.toJSON({ versionKey: false })))
         .exec(function(err, replies) {
             if (err) {
                 logger.error(error.message.server.redisWriteError + err);
@@ -112,14 +112,14 @@ var updateItemCallback = function (req, res, next) {
             logger.error(error.message.server.mongoUpdateError + err);
             res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
         } else if (item) {
-            User.populate(item, { path: 'user', select : Model.UserFieldsForCli }, 
+            User.populate(item, { path: 'user', select: Model.UserFieldsForCli },
                 function (err, item) {
                     if (err)
                         logger.error(error.message.server.mongoQueryError + err);
-                    res.status(201).jsonp({data: { item: item.toJSON({ versionKey: false }) }});
+                    res.status(201).jsonp({ data: { item: item.toJSON({ versionKey: false }) } });
                     if (next)
                         next()
-            });
+                });
         }
     }
 }
@@ -166,12 +166,12 @@ function checkCache(req, res, next) {
     if (req.params.itemId) {
         var item = db.redis.get(req.params.itemId)
         if (item)
-            return res.status(200).jsonp({data:{item:item}})
+            return res.status(200).jsonp({ data: { item: item } })
         else
             next()
     } else {
-		return res.status(400).jsonp({errorMessage:'缺少itemId'});
-	}
+        return res.status(400).jsonp({ errorMessage: '缺少itemId' });
+    }
 }
 
 router.get('/getItemDetail/:itemId', checkCache, function (req, res) {
@@ -198,34 +198,37 @@ router.get('/getItemDetail/:itemId', checkCache, function (req, res) {
  * 物品列表
  ***********************************************/
 function listCommonOperation(req, res, itemType) {
-    var query = Item.find({ type: parseInt(itemType) });
-    if (req.query.userId)
-        query.where('user').equals(req.query.userId);
-    else if (req.loginUser)
-        query.where('user').equals(req.loginUser._id);
-    else
-        return res.status(400).jsonp({ errorMessage: error.object.fieldRequired });
-    if (req.query.nextId)
-        query.where('_id').gt(req.query.nextId);
-    query.select(Model.ItemFieldsForCli);
-    query.sort({'_id': 1}).limit(parseInt(req.query.numPerPage));
-    query.populate('user', Model.UserFieldsForCli);
-    query.exec(function (err, items) {
-        if (err) {
-            logger.error(error.message.server.mongoQueryError + err);
-            return res.status(500).jsonp({errorMessage:error.message.client.databaseError});
-        } else if (items) {
-            _.each(items, function (item) {
-                item.descriptionSummary = item.descriptionContent.substr(0, 30);
-                item.descriptionContent = undefined;
-            });
-            return res.status(200).jsonp({data :{
-                nextId:items.slice(-1)[0]._id, 
-                pageCount:req.query.pageCount, 
-                itemList:items
-            }});
-        }
-    });
+    if (req.query.userId || req.loginUser) {
+        var query = Item.find({
+            user: req.query.userId || req.loginUser._id,
+            type: parseInt(itemType)
+        });
+        if (req.query.nextId)
+            query.where('_id').gt(req.query.nextId);
+        query.select(Model.ItemFieldsForCli);
+        query.sort({ '_id': 1 }).limit(parseInt(req.query.numPerPage));
+        query.populate('user', Model.UserFieldsForCli);
+        query.exec(function (err, items) {
+            if (err) {
+                logger.error(error.message.server.mongoQueryError + err);
+                return res.status(500).jsonp({ errorMessage: error.message.client.databaseError });
+            } else if (items) {
+                _.each(items, function (item) {
+                    item.descriptionSummary = item.descriptionContent.substr(0, 30);
+                    item.descriptionContent = undefined;
+                });
+                return res.status(200).jsonp({
+                    data: {
+                        nextId: items.slice(-1)._id,
+                        pageCount: req.query.pageCount,
+                        itemList: items
+                    }
+                });
+            }
+        });
+    } else {
+        res.status(400).jsonp({ errorMessage: error.object.fieldRequired });
+    }
 }
 
 //获取用户发布的物品列表
@@ -342,15 +345,15 @@ router.get('/getMyFavoriteItemList', global.checkSession, global.decryptOnReques
             }
         });
     };
-    var getItems = function(itemIds, next) {
-        Item.find({_id:{$in:itemIds}}, Model.ItemFieldsForCli)
+    var getItems = function (itemIds, next) {
+        Item.find({ _id: { $in: itemIds } }, Model.ItemFieldsForCli)
             .populate('user', Model.UserFieldsForCli)
-            .exec(function(err, items) {
+            .exec(function (err, items) {
                 if (err) {
                     logger.error(error.message.server.mongoQueryError + err);
                     next(error.object.databaseError);
                 } else if (items) {
-                    next(null, items);                            
+                    next(null, items);
                 } else {
                     next(error.object.itemNotFound);
                 }

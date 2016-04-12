@@ -18,5 +18,6 @@
     },
     "cacheListMaxLen" : 50,
     "loginSessionLife" : 86400,
-    "itemCacheTime" : 86400
+    "itemCacheTime" : 86400,
+    "defaultNumPerPage" : 10
 }
