@@ -36,8 +36,8 @@ var listCommonCallback = function(done) {
 		should.not.exist(err);
 		res.status.should.equal(200);
 		should(res.body.data).be.ok;
-        should(res.body.data).have.property('nextId');
-        should(res.body.data.nextId).be.a.String;
+        //should(res.body.data).have.property('nextId');
+        //should(res.body.data.nextId).be.a.String;
         should(res.body.data).have.property('pageCount');
         should(res.body.data.pageCount).be.a.Number;
         should(res.body.data).have.property('itemList');
