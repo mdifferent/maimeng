@@ -22,28 +22,12 @@ function addItemCommon(req, res, next) {
         data.loginId = undefined;
         data.user = req.loginUser._id;
         data.disable = false;
-        /*
-        var newItem = new Item(data)
-        newItem.save(function (err) {
-            if (err) {
-                logger.error(error.message.server.mongoInsertError + err);
-                res.status(500).jsonp({ errorMessage: error.message.client.databaseError })
-            } else {
-                newItem.on('es-indexed', function (err, res) {
-                    if (err) {
-                        logger.error(error.message.server.mongoInsertError + err);
-                        res.status(500).jsonp({ errorMessage: error.message.client.databaseError })
-                    }
-                    next()
-                });
-            }
-        })*/
+        
         Item.create(data, function (err, item) {
             item.on('es-indexed', function(err, result) {
-                if (err)
-                    logger.error(err)
-                else
-                    logger.info("Item indexed:") 
+                if (err) logger.error(err)
+                else if (result) logger.info("Item indexed:", result)
+                else logger.info("Item indexed without result")
             });
             if (err) {
                 logger.error(error.message.server.mongoInsertError + err);

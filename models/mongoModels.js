@@ -68,7 +68,27 @@ ItemSchema.plugin(mongoosastic, {
 
 var ItemModel = mongoose.model('items', ItemSchema)
 
-ItemModel.createMapping(function (err, mapping) {
+ItemModel.createMapping({
+    index: 'items',
+    type: 'itemName',
+    body: {
+        properties: {
+            name: {
+                type: 'string',
+                analyzer: 'ik_syno_smart',
+                search_analyzer: 'ik_syno_smart'
+            },
+            type: {
+                type: 'integer',
+                index: 'not_analyzed',
+            },
+            regionCode: {
+                type: 'integer',
+                index: 'not_analyzed',
+            }
+        }
+    }
+}, function (err, mapping) {
     if (err) {
         logger.error('error creating mapping (you can safely ignore this)');
         logger.error(err);
