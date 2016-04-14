@@ -7,9 +7,7 @@ var express = require('express'),
     _ = require('lodash'),
     logger = require('log4js').getLogger("search"),
     Model = require('../models/mongoModels'),
-    Item = require('../models/mongoModels').Item,
-    config = require('../config/db.json'),
-    http = require('http')
+    Item = require('../models/mongoModels').Item
 
 function searchItemCommon(req, res, itemType) {
     Item.search({

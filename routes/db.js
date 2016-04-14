@@ -3,8 +3,7 @@ var logger = require('log4js').getLogger("db"),
     async = require('async'),
     _ = require('lodash'),
     mongoose = require('mongoose'),
-    redis = require('redis'),
-    elasticsearch = require('elasticsearch')
+    redis = require('redis')
 
 var mongoCollections = ['users', 'items', 'comments']
 var initOps = {

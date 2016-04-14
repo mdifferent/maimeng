@@ -55,10 +55,11 @@ var ItemSchema = new Schema({
 ItemSchema.plugin(mongoosastic, {
     index: "items",
     type: "itemName",
+    /*
     bulk: {
         size: 10, // preferred number of docs to bulk index
         delay: 1000 //milliseconds to wait for enough docs to meet size constraint
-    },
+    },*/
     hosts: [config.elasticsearch.host],
     hydrate: true,
     hydrateOptions: {
@@ -76,7 +77,7 @@ ItemModel.createMapping({
             name: {
                 type: 'string',
                 analyzer: 'ik_syno_smart',
-                search_analyzer: 'ik_syno_smart'
+                search_analyzer: 'ik_syno'
             },
             type: {
                 type: 'integer',
