@@ -10,6 +10,21 @@ var express = require('express'),
 
 module.exports = router;
 
+//管理员登录
+router.get('/AdminLogin', function(req, res) {
+    
+})
+
+//管理类别
+router.get('/CategoryManage', function(req, res) {
+    
+})
+
+//管理同义词
+router.get('/SynonymManage', function(req, res) {
+    
+})
+
 //发送通知
 router.post('/SendMessage', function (req, res) {
 	

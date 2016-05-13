@@ -52,7 +52,7 @@ app.use(function(req, res, next) {
    //logger.debug(req); 
    var token = req.body.loginId || req.query.loginId;
    //logger.debug("App token:", token);
-   if (token) {
+   if (token && token.length > 1) {
        var md5 = crypto.createHash('md5');
        md5.update(token);
        var hashedToken = md5.digest('hex');
